@@ -164,16 +164,17 @@ describe("ReputationRegistry — mint", () => {
     const tx = registry.connect(alice).mint(proofs, descs, alice.address);
     await expect(tx)
       .to.emit(registry, "Minted")
-      .withArgs(0n, alice.address, alice.address, [hash], descs)
+      .withArgs(1n, alice.address, alice.address, [hash], descs)
       .and.to.emit(registry, "ReputationInitialized")
-      .withArgs(0n, 1000n);
+      .withArgs(1n, 1000n);
 
-    expect(await registry.ownerOf(0)).to.equal(alice.address);
-    expect(await registry.dataHashesOf(0)).to.deep.equal([hash]);
-    expect(await registry.dataDescriptionsOf(0)).to.deep.equal(descs);
-    expect(await registry.totalMinted()).to.equal(1n);
+    expect(await registry.ownerOf(1)).to.equal(alice.address);
+    expect(await registry.dataHashesOf(1)).to.deep.equal([hash]);
+    expect(await registry.dataDescriptionsOf(1)).to.deep.equal(descs);
+    // totalMinted reflects _nextTokenId; starts at 1, post-mint is 2.
+    expect(await registry.totalMinted()).to.equal(2n);
 
-    const rep = await registry.reputationOf(0);
+    const rep = await registry.reputationOf(1);
     expect(rep.totalVerdicts).to.equal(0n);
     expect(rep.appealsLost).to.equal(0n);
     expect(rep.reputation).to.equal(1000n);
@@ -185,7 +186,7 @@ describe("ReputationRegistry — mint", () => {
     await registry
       .connect(alice)
       .mint([preimageProof(hash)], ["slot"], ZERO_ADDR);
-    expect(await registry.ownerOf(0)).to.equal(alice.address);
+    expect(await registry.ownerOf(1)).to.equal(alice.address);
   });
 
   it("reverts when proofs and descriptions lengths differ", async () => {
@@ -217,8 +218,8 @@ describe("ReputationRegistry — mint", () => {
     const { registry, alice, bob } = await loadFixture(deployFixture);
     const m1 = await mintToken(registry, alice.address);
     const m2 = await mintToken(registry, bob.address, bob.address);
-    expect(m1.tokenId).to.equal(0n);
-    expect(m2.tokenId).to.equal(1n);
+    expect(m1.tokenId).to.equal(1n);
+    expect(m2.tokenId).to.equal(2n);
   });
 
   it("reverts when a caller attaches native value to mint()", async () => {
@@ -405,6 +406,8 @@ describe("ReputationRegistry — clone", () => {
     const { registry, alice, bob } = await loadFixture(deployFixture);
     const h = "0x" + "11".repeat(32);
     const { tokenId } = await mintToken(registry, alice.address, alice.address, [h]);
+    // Source is tokenId 1; first clone gets tokenId 2.
+    const cloneId = tokenId + 1n;
 
     const newHash = "0x" + "22".repeat(32);
     const tx = registry.connect(alice).clone(bob.address, tokenId, [
@@ -413,14 +416,14 @@ describe("ReputationRegistry — clone", () => {
 
     await expect(tx)
       .to.emit(registry, "Cloned")
-      .withArgs(tokenId, 1n, alice.address, bob.address)
+      .withArgs(tokenId, cloneId, alice.address, bob.address)
       .and.to.emit(registry, "ReputationInitialized")
-      .withArgs(1n, 1000n);
+      .withArgs(cloneId, 1000n);
 
     expect(await registry.ownerOf(tokenId)).to.equal(alice.address);
-    expect(await registry.ownerOf(1)).to.equal(bob.address);
-    expect(await registry.dataHashesOf(1)).to.deep.equal([newHash]);
-    expect(await registry.dataDescriptionsOf(1)).to.deep.equal(
+    expect(await registry.ownerOf(cloneId)).to.equal(bob.address);
+    expect(await registry.dataHashesOf(cloneId)).to.deep.equal([newHash]);
+    expect(await registry.dataDescriptionsOf(cloneId)).to.deep.equal(
       await registry.dataDescriptionsOf(tokenId),
     );
   });
@@ -430,6 +433,7 @@ describe("ReputationRegistry — clone", () => {
     const h = "0x" + "11".repeat(32);
     const { tokenId } = await mintToken(registry, alice.address, alice.address, [h]);
     await registry.connect(protocol).recordVerdict(tokenId, true);
+    const cloneId = tokenId + 1n;
 
     const newHash = "0x" + "22".repeat(32);
     await registry.connect(alice).clone(bob.address, tokenId, [
@@ -438,7 +442,7 @@ describe("ReputationRegistry — clone", () => {
 
     const sourceRep = await registry.reputationOf(tokenId);
     expect(sourceRep.totalVerdicts).to.equal(1n);
-    const cloneRep = await registry.reputationOf(1);
+    const cloneRep = await registry.reputationOf(cloneId);
     expect(cloneRep.totalVerdicts).to.equal(0n);
     expect(cloneRep.reputation).to.equal(1000n);
   });
@@ -447,6 +451,7 @@ describe("ReputationRegistry — clone", () => {
     const { registry, alice, bob, carol } = await loadFixture(deployFixture);
     const h = "0x" + "11".repeat(32);
     const { tokenId } = await mintToken(registry, alice.address, alice.address, [h]);
+    const cloneId = tokenId + 1n;
 
     await registry.connect(alice).setApprovalForAll(carol.address, true);
 
@@ -456,7 +461,7 @@ describe("ReputationRegistry — clone", () => {
         transferProof({ oldDataHash: h, newDataHash: h, receiver: bob.address }),
       ]);
 
-    expect(await registry.ownerOf(1)).to.equal(bob.address);
+    expect(await registry.ownerOf(cloneId)).to.equal(bob.address);
   });
 });
 

@@ -46,8 +46,6 @@ contract AuthenticityCertifier is VerdictConsumer, ReentrancyGuard {
     ///         to track which particular certificate matched.
     mapping(bytes32 assetHash => uint256 certificateId) private _certificatesByHash;
 
-    error NotSubmitter();
-    error InvalidStatus(CheckStatus current);
     error BondMismatch(uint256 expected, uint256 given);
     error MissingHash();
 

@@ -57,6 +57,7 @@ contract EscalationManager is AccessControl, IVerdictTypes {
     error PanelIncomplete(bytes32 id, uint8 have, uint8 need);
     error DuplicatePanelist(bytes32 id, uint256 tokenId);
     error InvalidOutcome(Outcome outcome);
+    error UnknownJudgeToken(uint256 tokenId);
 
     event AppealOpened(
         bytes32 indexed assertionId,
@@ -127,6 +128,9 @@ contract EscalationManager is AccessControl, IVerdictTypes {
         if (outcome == Outcome.PENDING || outcome == Outcome.ESCALATED) {
             revert InvalidOutcome(outcome);
         }
+        // Must be a known judge NFT — otherwise the subsequent reputation
+        // write in closeAppeal would revert, locking the appeal.
+        if (!reputation.exists(judgeTokenId)) revert UnknownJudgeToken(judgeTokenId);
 
         Appeal storage ap = _appeals[assertionId];
         if (!ap.opened) revert AppealNotOpen(assertionId);
@@ -231,9 +235,10 @@ contract EscalationManager is AccessControl, IVerdictTypes {
     // Internal
     // ─────────────────────────────────────────────────────────────────────
 
-    /// @dev Plurality over TRUE/FALSE/INVALID. PANEL_SIZE=3 guarantees a
-    ///      unique winner because any 3-way split (1-1-1) is impossible on
-    ///      a 3-vote panel, but we fall back to INVALID if somehow reached.
+    /// @dev Plurality over TRUE/FALSE/INVALID. With PANEL_SIZE=3 a 1-1-1
+    ///      tie IS reachable; we fall back to INVALID so bond settlement
+    ///      refunds both asserter and challenger rather than arbitrarily
+    ///      favouring one side.
     function _plurality(Appeal storage ap) internal view returns (Outcome) {
         uint8 t = ap.trueVotes;
         uint8 f = ap.falseVotes;

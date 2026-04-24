@@ -58,6 +58,7 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
     error EvidenceMissing();
     error NotInCoverage();
     error NotExpired();
+    error ClaimNotResolved();
 
     event PolicyCreated(
         uint256 indexed policyId,
@@ -196,6 +197,25 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
         emit Expired(policyId, amount);
     }
 
+    /// @notice Escape hatch for a claim that the judge ruled INVALID.
+    ///         Because INVALID outcomes never reach the enforcer, the
+    ///         policy would otherwise be stuck in CLAIM_PENDING forever.
+    ///         The holder may call this once the registry has actually
+    ///         resolved the assertion with an INVALID outcome, returning
+    ///         the policy to ACTIVE so they can re-claim.
+    function rescueInvalidClaim(uint256 policyId) external nonReentrant {
+        Policy storage p = _policies[policyId];
+        if (msg.sender != p.holder) revert NotHolder();
+        if (p.status != PolicyStatus.CLAIM_PENDING) revert InvalidStatus(p.status);
+
+        IAssertionRegistry.Assertion memory a = registry.getAssertion(p.assertionId);
+        // Resolved path: registry.isResolved would be true.
+        if (a.outcome != Outcome.INVALID) revert ClaimNotResolved();
+
+        p.status = PolicyStatus.ACTIVE;
+        emit ClaimRejected(policyId, p.assertionId);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Verdict callback
     // ─────────────────────────────────────────────────────────────────────
@@ -255,19 +275,5 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
                     p.condition
                 )
             );
-    }
-
-    function _toString(uint256 v) internal pure returns (string memory) {
-        if (v == 0) return "0";
-        uint256 digits;
-        uint256 tmp = v;
-        while (tmp != 0) { digits++; tmp /= 10; }
-        bytes memory out = new bytes(digits);
-        while (v != 0) {
-            digits--;
-            out[digits] = bytes1(uint8(48 + (v % 10)));
-            v /= 10;
-        }
-        return string(out);
     }
 }

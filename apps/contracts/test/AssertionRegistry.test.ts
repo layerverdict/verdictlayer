@@ -312,6 +312,88 @@ describe("AssertionRegistry — AUDITED flow", () => {
     expect(a2.outcome).to.equal(BigInt(Outcome.FALSE));
   });
 
+  it("INVALID final outcome refunds both asserter and challenger", async () => {
+    const { registry, escalation, reputation, alice, bob, judge, backend, admin } =
+      await loadFixture(deployProtocol);
+
+    const t0 = await mintJudgeAgent(reputation, admin, admin.address, H(0x01), "judge0");
+    const t1 = await mintJudgeAgent(reputation, admin, admin.address, H(0x02), "judge1");
+    const t2 = await mintJudgeAgent(reputation, admin, admin.address, H(0x03), "judge2");
+
+    const Sink = await ethers.getContractFactory("CallbackSink");
+    const sink = await Sink.deploy();
+    await sink.waitForDeployment();
+
+    const bond = ethers.parseEther("0.04");
+    const input = makeInput({
+      callback: await sink.getAddress(),
+      callbackSelector: sink.interface.getFunction("onVerdict").selector,
+      mode: Mode.AUDITED,
+      challengePeriod: 600n,
+      bond,
+    });
+    const tx = await registry.connect(alice).createAssertion(input, { value: bond });
+    const id = (await tx.wait())!.logs
+      .map((l) => registry.interface.parseLog({ topics: l.topics as string[], data: l.data }))
+      .find((l) => l?.name === "AssertionCreated")!.args.id as string;
+
+    await registry
+      .connect(judge)
+      .submitVerdict(id, Outcome.TRUE, H(0x33), H(0x44), 0);
+    await registry.connect(bob).challengeAssertion(id, { value: bond });
+
+    // 1-1-1 split → plurality returns INVALID.
+    await escalation.connect(admin).openAppeal(id);
+    await escalation.connect(backend).recordPanelVote(id, t0, Outcome.TRUE);
+    await escalation.connect(backend).recordPanelVote(id, t1, Outcome.FALSE);
+    await escalation.connect(backend).recordPanelVote(id, t2, Outcome.INVALID);
+
+    const aliceBalBefore = await ethers.provider.getBalance(alice.address);
+    const bobBalBefore = await ethers.provider.getBalance(bob.address);
+    await escalation.connect(admin).closeAppeal(id);
+
+    expect(await ethers.provider.getBalance(alice.address)).to.equal(
+      aliceBalBefore + bond,
+    );
+    expect(await ethers.provider.getBalance(bob.address)).to.equal(
+      bobBalBefore + bond,
+    );
+
+    const a = await registry.getAssertion(id);
+    expect(a.outcome).to.equal(BigInt(Outcome.INVALID));
+    // Callback NOT dispatched on INVALID.
+    expect((await sink.calls()).length).to.equal(0);
+  });
+
+  it("rejects zero-bond challenges on AUDITED assertions", async () => {
+    const { registry, alice, judge } = await loadFixture(deployProtocol);
+
+    const Sink = await ethers.getContractFactory("CallbackSink");
+    const sink = await Sink.deploy();
+    await sink.waitForDeployment();
+
+    // AUDITED with bond = 0 — meaningless but allowed at creation.
+    const input = makeInput({
+      callback: await sink.getAddress(),
+      callbackSelector: sink.interface.getFunction("onVerdict").selector,
+      mode: Mode.AUDITED,
+      challengePeriod: 600n,
+      bond: 0n,
+    });
+    const tx = await registry.connect(alice).createAssertion(input, { value: 0 });
+    const id = (await tx.wait())!.logs
+      .map((l) => registry.interface.parseLog({ topics: l.topics as string[], data: l.data }))
+      .find((l) => l?.name === "AssertionCreated")!.args.id as string;
+
+    await registry
+      .connect(judge)
+      .submitVerdict(id, Outcome.TRUE, H(0x33), H(0x44), 0);
+
+    await expect(
+      registry.challengeAssertion(id, { value: 0 }),
+    ).to.be.revertedWithCustomError(registry, "ZeroBondChallenge");
+  });
+
   it("challenger loses: asserter keeps both bonds", async () => {
     const { registry, escalation, reputation, alice, bob, judge, backend, admin } =
       await loadFixture(deployProtocol);
@@ -354,5 +436,40 @@ describe("AssertionRegistry — AUDITED flow", () => {
     expect(aliceBalAfter - aliceBalBefore).to.equal(bond * 2n);
     const a = await registry.getAssertion(id);
     expect(a.outcome).to.equal(BigInt(Outcome.TRUE));
+  });
+});
+
+describe("EscalationManager — panel input validation", () => {
+  it("rejects recordPanelVote for an unminted judge tokenId", async () => {
+    const { registry, escalation, alice, bob, judge, backend, admin } =
+      await loadFixture(deployProtocol);
+
+    const Sink = await ethers.getContractFactory("CallbackSink");
+    const sink = await Sink.deploy();
+    await sink.waitForDeployment();
+
+    const bond = ethers.parseEther("0.01");
+    const input = makeInput({
+      callback: await sink.getAddress(),
+      callbackSelector: sink.interface.getFunction("onVerdict").selector,
+      mode: Mode.AUDITED,
+      challengePeriod: 600n,
+      bond,
+    });
+    const tx = await registry.connect(alice).createAssertion(input, { value: bond });
+    const id = (await tx.wait())!.logs
+      .map((l) => registry.interface.parseLog({ topics: l.topics as string[], data: l.data }))
+      .find((l) => l?.name === "AssertionCreated")!.args.id as string;
+
+    await registry
+      .connect(judge)
+      .submitVerdict(id, Outcome.TRUE, H(0x33), H(0x44), 0);
+    await registry.connect(bob).challengeAssertion(id, { value: bond });
+    await escalation.connect(admin).openAppeal(id);
+
+    // tokenId 999 has never been minted.
+    await expect(
+      escalation.connect(backend).recordPanelVote(id, 999, Outcome.FALSE),
+    ).to.be.revertedWithCustomError(escalation, "UnknownJudgeToken");
   });
 });

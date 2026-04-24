@@ -82,7 +82,11 @@ contract ReputationRegistry is
     mapping(address owner => mapping(address operator => bool)) private _operatorApprovals;
     mapping(uint256 tokenId => ReputationData) private _reputation;
 
-    uint256 private _nextTokenId;
+    /// @dev Token ids start at 1 so that `judgeTokenId == 0` unambiguously
+    ///      means "no judge assigned" in downstream protocol state
+    ///      (AssertionRegistry.submitVerdict can legitimately be called
+    ///      with tokenId 0 when the relayer hasn't minted a judge NFT yet).
+    uint256 private _nextTokenId = 1;
 
     string private _name;
     string private _symbol;

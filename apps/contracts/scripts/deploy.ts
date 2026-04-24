@@ -138,11 +138,7 @@ async function main() {
 
   // 3. AssertionRegistry
   const RegistryFactory = await ethers.getContractFactory("AssertionRegistry");
-  const registry = await RegistryFactory.deploy(
-    deployer.address,
-    cfg.feeSink,
-    reputationAddr,
-  );
+  const registry = await RegistryFactory.deploy(deployer.address, cfg.feeSink);
   await registry.waitForDeployment();
   const registryAddr = await registry.getAddress();
   console.log("  AssertionRegistry    →", registryAddr);
@@ -278,7 +274,7 @@ async function main() {
       {
         name: "AssertionRegistry",
         address: registryAddr,
-        args: [deployer.address, cfg.feeSink, reputationAddr],
+        args: [deployer.address, cfg.feeSink],
       },
       {
         name: "VerdictEnforcer",

@@ -1,6 +1,9 @@
 # Slither Analysis Report
 
 Last run: 2026-04-24 against Slither 0.11.4 / solc 0.8.24.
+Total findings: 46 — all fall into the categories explained below (documented
+false positives or intentional design choices). High-severity and medium
+findings are resolved; remaining items are informational.
 
 Command:
 

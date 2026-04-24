@@ -47,7 +47,6 @@ export async function deployProtocol() {
   const registry = (await RegistryFactory.deploy(
     admin.address,
     feeSink.address,
-    await reputation.getAddress(),
   )) as unknown as AssertionRegistry;
   await registry.waitForDeployment();
 

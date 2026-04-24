@@ -4,7 +4,6 @@ pragma solidity 0.8.24;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 import {IVerdictEnforcer} from "./IVerdictEnforcer.sol";
-import {IVerdictTypes} from "../interfaces/IVerdictTypes.sol";
 
 /// @title VerdictEnforcer
 /// @notice Thin dispatcher that fires an application contract's callback
@@ -30,6 +29,7 @@ contract VerdictEnforcer is IVerdictEnforcer, AccessControl {
 
     error ZeroAddress();
     error CallbackFailed(bytes32 assertionId, bytes returndata);
+    error CallbackTargetNotContract(address target);
 
     event CallbackDispatched(
         bytes32 indexed assertionId,
@@ -67,6 +67,10 @@ contract VerdictEnforcer is IVerdictEnforcer, AccessControl {
         bytes32 reasoningRoot
     ) external override onlyRole(REGISTRY_ROLE) {
         if (target == address(0)) revert ZeroAddress();
+        // Prevent silently dispatching into an EOA: `.call` would succeed
+        // with no effect, and the assertion would settle as "delivered"
+        // without the application ever seeing the outcome.
+        if (target.code.length == 0) revert CallbackTargetNotContract(target);
 
         bytes memory payload = abi.encodeWithSelector(
             selector,

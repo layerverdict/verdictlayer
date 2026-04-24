@@ -70,6 +70,7 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
     error EvidenceMissing();
     error AmountMismatch(uint256 expected, uint256 given);
     error GrantNotExpired();
+    error GrantClosed();
     error AlreadyReclaimed();
     error MilestoneIndexOutOfRange(uint256 given, uint256 length);
     error MilestoneNotLinked(bytes32 assertionId);
@@ -169,9 +170,13 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
         uint256 grantId,
         uint256 milestoneIndex,
         bytes32 evidenceRoot
-    ) external payable returns (bytes32 assertionId) {
+    ) external payable nonReentrant returns (bytes32 assertionId) {
         Grant storage g = _grants[grantId];
         if (msg.sender != g.grantee) revert NotGrantee();
+        // Grant funds may have been reclaimed after expiry; reject late
+        // submissions so the grantee's bond isn't locked by a callback
+        // that would revert on insufficient token balance.
+        if (g.reclaimed || block.timestamp > g.grantExpiresAt) revert GrantClosed();
         if (milestoneIndex >= g.milestones.length) {
             revert MilestoneIndexOutOfRange(milestoneIndex, g.milestones.length);
         }
@@ -202,7 +207,10 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
             )
         });
 
-        // Inline the registry call so we can pack the 2D lookup key.
+        // The callback needs a (grantId, milestoneIndex) pair to know which
+        // milestone to route the outcome to; we pack both into the
+        // `_assertionToMilestone` key and keep the standard
+        // `_assertionToLocal` mapping so `localIdFor()` stays usable.
         assertionId = registry.createAssertion{value: assertionBond}(input);
         m.assertionId = assertionId;
         _assertionToMilestone[assertionId] =
@@ -325,19 +333,5 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
                     criteria
                 )
             );
-    }
-
-    function _toString(uint256 v) internal pure returns (string memory) {
-        if (v == 0) return "0";
-        uint256 digits;
-        uint256 tmp = v;
-        while (tmp != 0) { digits++; tmp /= 10; }
-        bytes memory out = new bytes(digits);
-        while (v != 0) {
-            digits--;
-            out[digits] = bytes1(uint8(48 + (v % 10)));
-            v /= 10;
-        }
-        return string(out);
     }
 }

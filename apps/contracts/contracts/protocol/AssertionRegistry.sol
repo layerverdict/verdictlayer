@@ -5,7 +5,6 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IAssertionRegistry} from "../interfaces/IAssertionRegistry.sol";
-import {ReputationRegistry} from "../reputation/ReputationRegistry.sol";
 import {IVerdictEnforcer} from "./IVerdictEnforcer.sol";
 
 /// @title AssertionRegistry
@@ -61,11 +60,9 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
 
     uint64 public constant MIN_CHALLENGE_PERIOD = 5 minutes;
     uint64 public constant MAX_CHALLENGE_PERIOD = 7 days;
-    uint256 public constant MIN_BOND = 0;
 
     address public feeSink;
     IVerdictEnforcer public enforcer;
-    ReputationRegistry public reputation;
 
     // ─────────────────────────────────────────────────────────────────────
     // Storage
@@ -92,14 +89,13 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
     error ChallengeWindowStillOpen();
     error OutcomeCannotBePending();
     error EnforcerNotSet();
-    error ReputationNotSet();
+    error ZeroBondChallenge();
 
     // ─────────────────────────────────────────────────────────────────────
     // Events — beyond the interface spec
     // ─────────────────────────────────────────────────────────────────────
 
     event EnforcerUpdated(address indexed previous, address indexed current);
-    event ReputationUpdated(address indexed previous, address indexed current);
     event FeeSinkUpdated(address indexed previous, address indexed current);
     event BondSettled(
         bytes32 indexed id,
@@ -112,16 +108,14 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
     // Construction
     // ─────────────────────────────────────────────────────────────────────
 
-    constructor(address admin, address feeSink_, address reputationAddr) {
+    constructor(address admin, address feeSink_) {
         if (admin == address(0)) revert ZeroAddress();
         if (feeSink_ == address(0)) revert ZeroAddress();
-        if (reputationAddr == address(0)) revert ZeroAddress();
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(ADMIN_ROLE, admin);
 
         feeSink = feeSink_;
-        reputation = ReputationRegistry(reputationAddr);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -142,13 +136,6 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
         address previous = feeSink;
         feeSink = newSink;
         emit FeeSinkUpdated(previous, newSink);
-    }
-
-    function setReputation(address newReputation) external onlyRole(ADMIN_ROLE) {
-        if (newReputation == address(0)) revert ZeroAddress();
-        address previous = address(reputation);
-        reputation = ReputationRegistry(newReputation);
-        emit ReputationUpdated(previous, newReputation);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -266,6 +253,11 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
             revert ChallengeWindowClosed();
         }
         if (msg.value != a.bond) revert BondMismatch(a.bond, msg.value);
+        // A zero-bond AUDITED assertion cannot be meaningfully challenged —
+        // there is nothing at stake on either side and the challenge
+        // amounts to free dispute spam. Application contracts must post a
+        // non-zero bond whenever they choose AUDITED mode.
+        if (msg.value == 0) revert ZeroBondChallenge();
 
         a.status = Status.CHALLENGED;
         a.challenger = msg.sender;
@@ -371,14 +363,23 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
             return;
         }
 
+        // With a challenge present:
+        //   INVALID — panel could not decide; neither side loses. Refund
+        //             both participants so the dispute is a net zero.
+        //   else    — compare to the original judge call. If the panel
+        //             flipped it, the challenger wins both bonds; if the
+        //             panel upheld it, the asserter wins both.
+        if (finalOutcome == Outcome.INVALID) {
+            _safeSendValue(a.id, a.asserter, asserterBond, "invalid_refund_asserter");
+            _safeSendValue(a.id, a.challenger, challengerBond, "invalid_refund_challenger");
+            return;
+        }
+
         bool challengerWon = finalOutcome != a.originalOutcome;
+        uint256 payout = asserterBond + challengerBond;
         if (challengerWon) {
-            // Challenger right: both bonds go to challenger.
-            uint256 payout = asserterBond + challengerBond;
             _safeSendValue(a.id, a.challenger, payout, "challenger_won");
         } else {
-            // Challenger wrong: asserter keeps own bond, gets challenger bond.
-            uint256 payout = asserterBond + challengerBond;
             _safeSendValue(a.id, a.asserter, payout, "challenger_lost");
         }
     }

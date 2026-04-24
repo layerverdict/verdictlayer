@@ -19,8 +19,8 @@ import {IVerdictCallback} from "../interfaces/IVerdictCallback.sol";
 ///         4. On dispute, escrow opens a Verdict assertion. Outcome:
 ///              TRUE  → client was right → refund to client
 ///              FALSE → freelancer was right → pay freelancer
-///              INVALID (ignored by enforcer — funds stay locked, manual
-///              resolution possible via admin-free `timeout` after 30 days).
+///              INVALID (ignored by enforcer — funds stay locked; safety
+///              valve is `expire()` once deadline + 30d has passed).
 contract Escrow is VerdictConsumer, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -160,15 +160,18 @@ contract Escrow is VerdictConsumer, ReentrancyGuard {
 
     /// @notice Open a dispute. Client must supply evidence and the contract
     ///         must have been funded with `assertionBond` (native 0G).
+    ///
+    ///         The freelancer must have already submitted a delivery. If
+    ///         they haven't, the client should call `expire()` once the
+    ///         escrow deadline has passed rather than fabricating a
+    ///         dispute over nothing.
     function openDispute(
         uint256 escrowId,
         bytes32 clientEvidence
     ) external payable returns (bytes32 assertionId) {
         EscrowRecord storage e = _escrows[escrowId];
         if (msg.sender != e.client) revert NotClient();
-        if (
-            e.status != EscrowStatus.DELIVERED && e.status != EscrowStatus.FUNDED
-        ) revert InvalidStatus(e.status);
+        if (e.status != EscrowStatus.DELIVERED) revert InvalidStatus(e.status);
         if (clientEvidence == bytes32(0)) revert EvidenceMissing();
         if (msg.value != assertionBond) revert BondNotFunded(msg.value, assertionBond);
 
@@ -302,19 +305,5 @@ contract Escrow is VerdictConsumer, ReentrancyGuard {
                     e.scope
                 )
             );
-    }
-
-    function _toString(uint256 v) internal pure returns (string memory) {
-        if (v == 0) return "0";
-        uint256 digits;
-        uint256 tmp = v;
-        while (tmp != 0) { digits++; tmp /= 10; }
-        bytes memory out = new bytes(digits);
-        while (v != 0) {
-            digits--;
-            out[digits] = bytes1(uint8(48 + (v % 10)));
-            v /= 10;
-        }
-        return string(out);
     }
 }

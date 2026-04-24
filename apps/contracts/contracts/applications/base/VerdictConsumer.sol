@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 import {IVerdictCallback} from "../../interfaces/IVerdictCallback.sol";
-import {IVerdictTypes} from "../../interfaces/IVerdictTypes.sol";
 import {IAssertionRegistry} from "../../interfaces/IAssertionRegistry.sol";
 
 /// @title VerdictConsumer
@@ -25,6 +24,7 @@ abstract contract VerdictConsumer is IVerdictCallback {
     error NotEnforcer(address caller);
     error UnknownAssertion(bytes32 assertionId);
     error LocalAlreadyLinked(bytes32 assertionId);
+    error InvalidLocalId();
 
     event AssertionLinked(bytes32 indexed assertionId, uint256 indexed localId);
 
@@ -48,6 +48,11 @@ abstract contract VerdictConsumer is IVerdictCallback {
         IAssertionRegistry.AssertionInput memory input,
         uint256 localId
     ) internal returns (bytes32 assertionId) {
+        // `0` is reserved as the "no link" sentinel in `_assertionToLocal`
+        // so the `onVerdict` routing can safely treat 0 as "unknown
+        // assertion". Reject callers that accidentally use 0 as a local
+        // primary key.
+        if (localId == 0) revert InvalidLocalId();
         assertionId = registry.createAssertion{value: input.bond}(input);
         if (_assertionToLocal[assertionId] != 0) revert LocalAlreadyLinked(assertionId);
         _assertionToLocal[assertionId] = localId;
@@ -64,4 +69,23 @@ abstract contract VerdictConsumer is IVerdictCallback {
     ///      refunds the bond back to the asserter on TRUE/FALSE outcomes,
     ///      so every consumer needs a payable fallback.
     receive() external payable {}
+
+    /// @dev Decimal string of an unsigned integer. Used by applications
+    ///      when composing a human-readable `claim` string for the judge.
+    function _toString(uint256 v) internal pure returns (string memory) {
+        if (v == 0) return "0";
+        uint256 digits;
+        uint256 tmp = v;
+        while (tmp != 0) {
+            digits++;
+            tmp /= 10;
+        }
+        bytes memory out = new bytes(digits);
+        while (v != 0) {
+            digits--;
+            out[digits] = bytes1(uint8(48 + (v % 10)));
+            v /= 10;
+        }
+        return string(out);
+    }
 }
