@@ -1,0 +1,55 @@
+import { formatUnits } from "viem";
+
+export function truncateHash(value: string, head = 6, tail = 4): string {
+  if (!value) return "";
+  if (value.length <= head + tail + 3) return value;
+  return `${value.slice(0, head)}…${value.slice(-tail)}`;
+}
+
+export function truncateAddress(value: string, chars = 4): string {
+  if (!value) return "";
+  return `${value.slice(0, 2 + chars)}…${value.slice(-chars)}`;
+}
+
+export function formatAmount(
+  wei: bigint | string | number,
+  decimals = 18,
+  fractionDigits = 4,
+): string {
+  const bi = typeof wei === "bigint" ? wei : BigInt(wei);
+  const formatted = formatUnits(bi, decimals);
+  const [whole, frac = ""] = formatted.split(".");
+  if (!frac) return whole ?? "0";
+  const trimmed = frac.slice(0, fractionDigits).replace(/0+$/, "");
+  return trimmed ? `${whole}.${trimmed}` : (whole ?? "0");
+}
+
+export function formatTimestamp(ts: string | number | Date): string {
+  const date = ts instanceof Date ? ts : new Date(ts);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+export function formatRelative(ts: string | number | Date): string {
+  const date = ts instanceof Date ? ts : new Date(ts);
+  const diffMs = date.getTime() - Date.now();
+  const abs = Math.abs(diffMs);
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  const units: [Intl.RelativeTimeFormatUnit, number][] = [
+    ["year", 1000 * 60 * 60 * 24 * 365],
+    ["month", 1000 * 60 * 60 * 24 * 30],
+    ["day", 1000 * 60 * 60 * 24],
+    ["hour", 1000 * 60 * 60],
+    ["minute", 1000 * 60],
+    ["second", 1000],
+  ];
+  for (const [unit, ms] of units) {
+    if (abs >= ms || unit === "second") {
+      return rtf.format(Math.round(diffMs / ms), unit);
+    }
+  }
+  return "just now";
+}

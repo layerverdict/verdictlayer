@@ -10,7 +10,9 @@
     "./network": "./src/network.ts",
     "./types": "./src/types.ts",
     "./deployments": "./src/deployments.ts",
-    "./abis": "./src/abis.ts"
+    "./abis": "./src/abis.ts",
+    "./abi/*.json": "./abis/*.json",
+    "./deployments/*.json": "./deployments/*.json"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
