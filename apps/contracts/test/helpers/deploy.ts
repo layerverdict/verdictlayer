@@ -25,8 +25,11 @@ export const Status = {
 } as const;
 
 export async function deployProtocol() {
-  const [admin, feeSink, judge, backend, alice, bob, charlie] =
-    await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const [admin, feeSink, judge, backend, alice, bob, charlie] = signers;
+  if (!admin || !feeSink || !judge || !backend || !alice || !bob || !charlie) {
+    throw new Error("hardhat returned fewer than 7 signers");
+  }
 
   const MockVerifierFactory = await ethers.getContractFactory("MockVerifier");
   const mockVerifier = (await MockVerifierFactory.deploy()) as unknown as MockVerifier;

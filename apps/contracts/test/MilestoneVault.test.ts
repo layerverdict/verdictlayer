@@ -86,7 +86,7 @@ describe("MilestoneVault", () => {
     await time.increase(60 * 60 + 1);
     const bobBalBefore = await token.balanceOf(bob.address);
     await registry.resolveAssertion(assertionId, Outcome.TRUE);
-    expect(await token.balanceOf(bob.address)).to.equal(bobBalBefore + amounts[0]);
+    expect(await token.balanceOf(bob.address)).to.equal(bobBalBefore + amounts[0]!);
 
     const m = await vault.getMilestone(grantId, 0);
     expect(m.status).to.equal(2n); // RELEASED
@@ -96,7 +96,7 @@ describe("MilestoneVault", () => {
     const { vault, token, alice, bob } = await loadFixture(deployVaultFixture);
 
     const amounts = [ethers.parseUnits("1000", 18), ethers.parseUnits("1000", 18)];
-    const total = amounts[0] + amounts[1];
+    const total = amounts[0]! + amounts[1]!;
     await token.connect(alice).approve(await vault.getAddress(), total);
     const expiry = BigInt(await time.latest()) + 3600n;
     await vault

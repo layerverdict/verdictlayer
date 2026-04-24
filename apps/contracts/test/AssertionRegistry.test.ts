@@ -8,17 +8,27 @@ const ZERO32 = "0x" + "00".repeat(32);
 const H = (b: number) => "0x" + b.toString(16).padStart(2, "0").repeat(32);
 const SEL = "0x12345678"; // arbitrary valid selector
 
-function makeInput(overrides: Partial<Record<string, unknown>> = {}) {
+interface AssertionInputOverrides {
+  claim?: string;
+  evidenceRoots?: string[];
+  callback?: string;
+  callbackSelector?: string;
+  mode?: number;
+  challengePeriod?: bigint | number;
+  bond?: bigint | number;
+  salt?: string;
+}
+
+function makeInput(overrides: AssertionInputOverrides = {}) {
   return {
-    claim: "test claim",
-    evidenceRoots: [H(0xaa), H(0xbb)],
+    claim: overrides.claim ?? "test claim",
+    evidenceRoots: overrides.evidenceRoots ?? [H(0xaa), H(0xbb)],
     callback: overrides.callback ?? ethers.ZeroAddress,
     callbackSelector: overrides.callbackSelector ?? SEL,
     mode: overrides.mode ?? Mode.INSTANT,
     challengePeriod: overrides.challengePeriod ?? 0n,
     bond: overrides.bond ?? 0n,
     salt: overrides.salt ?? H(0x01),
-    ...overrides,
   };
 }
 

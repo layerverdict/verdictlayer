@@ -112,9 +112,9 @@ describe("Verifier — verifyPreimage", () => {
     const h2 = HASH(0xbb);
     const outputs = await teeVerifier.verifyPreimage.staticCall([h1, h2]);
     expect(outputs.length).to.equal(2);
-    expect(outputs[0].dataHash).to.equal(h1);
-    expect(outputs[0].isValid).to.equal(true);
-    expect(outputs[1].dataHash).to.equal(h2);
+    expect(outputs[0]!.dataHash).to.equal(h1);
+    expect(outputs[0]!.isValid).to.equal(true);
+    expect(outputs[1]!.dataHash).to.equal(h2);
   });
 
   it("reverts when a proof isn't exactly 32 bytes", async () => {
@@ -144,11 +144,12 @@ describe("Verifier — verifyTransferValidity (public)", () => {
 
     const outputs = await teeVerifier.verifyTransferValidity.staticCall([proof]);
     expect(outputs.length).to.equal(1);
-    expect(outputs[0].isValid).to.equal(true);
-    expect(outputs[0].receiver).to.equal(signer.address);
-    expect(outputs[0].newDataHash).to.equal(newHash);
+    const out = outputs[0]!;
+    expect(out.isValid).to.equal(true);
+    expect(out.receiver).to.equal(signer.address);
+    expect(out.newDataHash).to.equal(newHash);
     // Public data leaves oldDataHash/sealedKey at defaults.
-    expect(outputs[0].oldDataHash).to.equal(ethers.ZeroHash);
+    expect(out.oldDataHash).to.equal(ethers.ZeroHash);
   });
 
   it("marks the proof nonce as used after a state-changing call", async () => {
@@ -224,11 +225,12 @@ describe("Verifier — verifyTransferValidity (private)", () => {
     });
 
     const outputs = await teeVerifier.verifyTransferValidity.staticCall([proof]);
-    expect(outputs[0].isValid).to.equal(true);
-    expect(outputs[0].receiver).to.equal(signer.address);
-    expect(outputs[0].oldDataHash).to.equal(oldHash);
-    expect(outputs[0].newDataHash).to.equal(newHash);
-    expect(outputs[0].sealedKey).to.equal(sealed);
+    const out = outputs[0]!;
+    expect(out.isValid).to.equal(true);
+    expect(out.receiver).to.equal(signer.address);
+    expect(out.oldDataHash).to.equal(oldHash);
+    expect(out.newDataHash).to.equal(newHash);
+    expect(out.sealedKey).to.equal(sealed);
   });
 
   it("reverts when a private proof is too short", async () => {
@@ -269,7 +271,8 @@ describe("Verifier — ZKP variant", () => {
     });
 
     const outputs = await zkpVerifier.verifyTransferValidity.staticCall([proof]);
-    expect(outputs[0].isValid).to.equal(true);
-    expect(outputs[0].receiver).to.equal(signer.address);
+    const out = outputs[0]!;
+    expect(out.isValid).to.equal(true);
+    expect(out.receiver).to.equal(signer.address);
   });
 });

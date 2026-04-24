@@ -35,7 +35,11 @@ function transferProof(opts: {
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 async function deployFixture() {
-  const [admin, alice, bob, carol, protocol] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const [admin, alice, bob, carol, protocol] = signers;
+  if (!admin || !alice || !bob || !carol || !protocol) {
+    throw new Error("hardhat returned fewer than 5 signers");
+  }
 
   const MockVerifierFactory = await ethers.getContractFactory("MockVerifier");
   const verifier = (await MockVerifierFactory.deploy()) as unknown as MockVerifier;
@@ -138,6 +142,7 @@ describe("ReputationRegistry — deployment", () => {
 
   it("rejects zero addresses in constructor", async () => {
     const [admin] = await ethers.getSigners();
+    if (!admin) throw new Error("no signers");
     const MockVerifier = await ethers.getContractFactory("MockVerifier");
     const verifier = await MockVerifier.deploy();
     await verifier.waitForDeployment();

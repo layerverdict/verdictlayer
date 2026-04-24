@@ -101,6 +101,7 @@ async function main() {
   const cfg = pickConfig(chainId);
 
   const [deployer] = await ethers.getSigners();
+  if (!deployer) throw new Error("no signer configured — set PRIVATE_KEY");
   console.log("Deploying from:", deployer.address);
   console.log("Chain id      :", chainId, `(${cfg.tag})`);
   console.log("Judge relayer :", cfg.judgeRelayer);
