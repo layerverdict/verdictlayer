@@ -1,11 +1,22 @@
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import sensible from "@fastify/sensible";
+import { ZodError } from "zod";
 import { config } from "./config.js";
+import { healthRoutes } from "./routes/health.js";
+import { evidenceRoutes } from "./routes/evidence.js";
+import { assertionRoutes } from "./routes/assertions.js";
+import { verdictRoutes } from "./routes/verdict.js";
+import { closeQueues } from "./lib/queue.js";
+import { closeRedis } from "./lib/redis.js";
+import { startJudgmentWorker } from "./workers/judgment.js";
+import { startAppealWorker } from "./workers/appeal.js";
+import { startIndexer } from "./workers/indexer.js";
 
-export async function buildServer() {
+export async function buildServer(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: config.NODE_ENV === "production" ? "info" : "debug",
@@ -15,6 +26,8 @@ export async function buildServer() {
           : undefined,
     },
     trustProxy: true,
+    disableRequestLogging: false,
+    bodyLimit: 8 * 1024 * 1024, // 8MB JSON bodies; evidence uploads use multipart
   });
 
   await app.register(sensible);
@@ -24,13 +37,57 @@ export async function buildServer() {
     max: 300,
     timeWindow: "1 minute",
   });
+  await app.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // mirrors MAX_UPLOAD_BYTES in storage service
+      files: 1,
+    },
+  });
 
-  app.get("/health", async () => ({
-    ok: true,
-    chainId: config.CHAIN_ID,
-    env: config.NODE_ENV,
-    ts: Date.now(),
-  }));
+  await app.register(healthRoutes);
+  await app.register(evidenceRoutes);
+  await app.register(assertionRoutes);
+  await app.register(verdictRoutes);
+
+  app.setNotFoundHandler((_req, reply) => {
+    reply.code(404).send({ error: "Not Found" });
+  });
+
+  app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
+    if (err instanceof ZodError) {
+      req.log.warn({ issues: err.issues }, "request validation failed");
+      return reply.code(400).send({ error: "ValidationError", issues: err.issues });
+    }
+
+    req.log.error({ err }, "request failed");
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    reply.code(status).send({
+      error: err.name ?? "InternalError",
+      message:
+        status >= 500 && config.NODE_ENV === "production"
+          ? "Internal Server Error"
+          : err.message,
+    });
+  });
+
+  // Embedded workers share the API's event bus — critical for SSE
+  // because the in-memory bus doesn't cross processes. Production can
+  // set EMBED_WORKERS=false and run the workers standalone once we
+  // swap eventBus for Redis pub/sub.
+  const workerHandles: Array<{ close: () => Promise<void> | void }> = [];
+  if (config.EMBED_WORKERS) {
+    workerHandles.push(startJudgmentWorker());
+    workerHandles.push(startAppealWorker());
+    const indexer = startIndexer();
+    workerHandles.push({ close: () => indexer.stop() });
+    app.log.info("workers + indexer embedded in API process");
+  }
+
+  app.addHook("onClose", async () => {
+    for (const h of workerHandles) await h.close();
+    await closeQueues();
+    await closeRedis();
+  });
 
   return app;
 }
@@ -43,9 +100,16 @@ async function main() {
     app.log.error(err);
     process.exit(1);
   }
+
+  const shutdown = async (signal: NodeJS.Signals) => {
+    app.log.info({ signal }, "shutting down");
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
 }
 
-// Run only when executed directly (not when imported by tests)
 const isDirectRun = import.meta.url === `file://${process.argv[1]}`;
 if (isDirectRun) {
   void main();

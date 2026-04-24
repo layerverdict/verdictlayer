@@ -90,6 +90,8 @@ export const reasoningLogs = pgTable(
   }),
 );
 
+export { indexerCheckpoints } from "./checkpoints.js";
+
 export type Assertion = typeof assertions.$inferSelect;
 export type NewAssertion = typeof assertions.$inferInsert;
 export type Evidence = typeof evidence.$inferSelect;

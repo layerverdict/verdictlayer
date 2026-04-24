@@ -22,7 +22,24 @@ const schema = z.object({
   QWEN3_PROVIDER: z.string().optional(),
   OG_INFERENCE_CONTRACT: z.string().optional(),
 
+  /** Panel judge tokenIds for the appeal swarm, comma-separated. */
+  PANEL_TOKEN_IDS: z
+    .string()
+    .regex(/^\d+,\d+,\d+$/, "PANEL_TOKEN_IDS must be 3 comma-separated integers")
+    .optional(),
+
   SENTRY_DSN: z.string().optional(),
+
+  /**
+   * When "true", the API process also runs the judgment + appeal
+   * workers and the chain indexer. Convenient for dev and for the
+   * hackathon's single-Hetzner deploy. Production at scale should run
+   * workers in separate processes (and swap eventBus for Redis pub/sub).
+   */
+  EMBED_WORKERS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export const config = schema.parse(process.env);

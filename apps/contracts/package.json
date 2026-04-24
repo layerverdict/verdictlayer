@@ -4,8 +4,9 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "build": "hardhat compile",
+    "build": "hardhat compile && ts-node scripts/export-abis.ts",
     "compile": "hardhat compile",
+    "export:abis": "ts-node scripts/export-abis.ts",
     "test": "hardhat test",
     "test:gas": "REPORT_GAS=true hardhat test",
     "coverage": "hardhat coverage",

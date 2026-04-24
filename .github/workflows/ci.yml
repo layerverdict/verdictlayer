@@ -28,7 +28,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @verdict/contracts compile
+      - run: pnpm --filter @verdict/contracts build
       - run: pnpm turbo run typecheck
 
   contracts-test:
@@ -51,6 +51,21 @@ jobs:
           # this throwaway key when PRIVATE_KEY isn't set, so CI never
           # touches a real account.
           PRIVATE_KEY: "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+  api-test:
+    name: API — unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @verdict/api test
 
   web-build:
     name: Web — next build

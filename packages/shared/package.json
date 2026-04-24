@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./network": "./src/network.ts",
     "./types": "./src/types.ts",
-    "./deployments": "./src/deployments.ts"
+    "./deployments": "./src/deployments.ts",
+    "./abis": "./src/abis.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

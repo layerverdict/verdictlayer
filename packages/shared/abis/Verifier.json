@@ -1,0 +1,248 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "_attestationContract",
+        "type": "address"
+      },
+      {
+        "internalType": "enum VerifierType",
+        "name": "_verifierType",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "given",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidAccessibilityProofLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "given",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidDataHashLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "given",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidProofLength",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "enum VerifierType",
+        "name": "expected",
+        "type": "uint8"
+      },
+      {
+        "internalType": "bool",
+        "name": "gotTEE",
+        "type": "bool"
+      }
+    ],
+    "name": "OracleTypeMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "proofNonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ProofAlreadyUsed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "value",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "length",
+        "type": "uint256"
+      }
+    ],
+    "name": "StringsInsufficientHexLength",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "proofNonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "ProofMarked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "attestationContract",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "enum VerifierType",
+        "name": "verifierType",
+        "type": "uint8"
+      }
+    ],
+    "name": "VerifierDeployed",
+    "type": "event"
+  },
+  {
+    "inputs": [],
+    "name": "attestationContract",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "proofNonce",
+        "type": "bytes32"
+      }
+    ],
+    "name": "isProofUsed",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "verifierType",
+    "outputs": [
+      {
+        "internalType": "enum VerifierType",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "proofs",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "verifyPreimage",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "dataHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bool",
+            "name": "isValid",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct PreimageProofOutput[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "pure",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes[]",
+        "name": "proofs",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "verifyTransferValidity",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "oldDataHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "newDataHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "receiver",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes16",
+            "name": "sealedKey",
+            "type": "bytes16"
+          },
+          {
+            "internalType": "bool",
+            "name": "isValid",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct TransferValidityProofOutput[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
