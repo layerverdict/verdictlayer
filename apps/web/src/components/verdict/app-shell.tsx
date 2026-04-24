@@ -8,22 +8,50 @@ import type { ReactNode } from "react";
 import { VerdictLogo } from "./logo";
 import { cn } from "@/lib/utils";
 
+type NavIconName =
+  | "dashboard"
+  | "escrow"
+  | "insurance"
+  | "milestone"
+  | "authenticity"
+  | "judges"
+  | "history";
+
 type NavItem = {
   href: string;
   label: string;
-  icon: "escrow" | "insurance" | "milestone" | "authenticity";
+  icon: NavIconName;
 };
 
 const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { href: "/escrow", label: "Escrow", icon: "escrow" },
   { href: "/insurance", label: "Insurance", icon: "insurance" },
   { href: "/milestones", label: "Milestones", icon: "milestone" },
   { href: "/authenticity", label: "Authenticity", icon: "authenticity" },
+  { href: "/judges", label: "Judges", icon: "judges" },
+  { href: "/history", label: "History", icon: "history" },
 ];
 
-function NavIcon({ name }: { name: NavItem["icon"] }) {
+const APPS_SET = new Set<NavIconName>([
+  "escrow",
+  "insurance",
+  "milestone",
+  "authenticity",
+]);
+
+function NavIcon({ name }: { name: NavIconName }) {
   const base = { className: "h-5 w-5", strokeWidth: 1.5 };
   switch (name) {
+    case "dashboard":
+      return (
+        <svg {...base} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="3" y="3" width="8" height="10" rx="1" />
+          <rect x="13" y="3" width="8" height="6" rx="1" />
+          <rect x="13" y="11" width="8" height="10" rx="1" />
+          <rect x="3" y="15" width="8" height="6" rx="1" />
+        </svg>
+      );
     case "escrow":
       return (
         <svg {...base} viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -50,6 +78,20 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
           <path d="M7.5 12 L11 15 L17 9" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       );
+    case "judges":
+      return (
+        <svg {...base} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="8" r="3.5" />
+          <path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" strokeLinecap="round" />
+        </svg>
+      );
+    case "history":
+      return (
+        <svg {...base} viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7 v5 l3 2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
   }
 }
 
@@ -69,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {NAV.map((item) => {
+            {NAV.filter((item) => APPS_SET.has(item.icon)).map((item) => {
               const active = pathname?.startsWith(item.href);
               return (
                 <Link
@@ -101,29 +143,21 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex flex-1">
         {/* Sidebar — shows only on md+ when we're on an app page */}
         <aside className="hidden w-60 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:block">
-          <div className="mb-4 px-3 font-mono text-[10px] uppercase tracking-widest text-white/30">
-            Applications
-          </div>
-          <nav className="space-y-1">
-            {NAV.map((item) => {
-              const active = pathname?.startsWith(item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    active
-                      ? "bg-white/[0.08] text-white"
-                      : "text-white/50 hover:bg-white/[0.04] hover:text-white",
-                  )}
-                >
-                  <NavIcon name={item.icon} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <SidebarSection
+            label="Overview"
+            items={NAV.filter((n) => n.icon === "dashboard")}
+            pathname={pathname}
+          />
+          <SidebarSection
+            label="Applications"
+            items={NAV.filter((n) => APPS_SET.has(n.icon))}
+            pathname={pathname}
+          />
+          <SidebarSection
+            label="Protocol"
+            items={NAV.filter((n) => n.icon === "judges" || n.icon === "history")}
+            pathname={pathname}
+          />
           <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.04] p-4">
             <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/30">
               Status
@@ -144,6 +178,45 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+function SidebarSection({
+  label,
+  items,
+  pathname,
+}: {
+  label: string;
+  items: NavItem[];
+  pathname: string | null | undefined;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-4">
+      <div className="mb-2 px-3 font-mono text-[10px] uppercase tracking-widest text-white/30">
+        {label}
+      </div>
+      <nav className="space-y-1">
+        {items.map((item) => {
+          const active = pathname?.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "bg-white/[0.08] text-white"
+                  : "text-white/50 hover:bg-white/[0.04] hover:text-white",
+              )}
+            >
+              <NavIcon name={item.icon} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
