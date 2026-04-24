@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { PageHeader } from "@/components/verdict/page-header";
 import { formatAmount, truncateAddress } from "@/lib/format";
@@ -40,9 +39,7 @@ export default function EscrowListPage() {
       {!escrowAddress ? (
         <NotDeployed chainId={chainId} />
       ) : (
-        <ConnectWall>
-          <EscrowList address={address} escrowAddress={escrowAddress} chainId={chainId} />
-        </ConnectWall>
+        <EscrowList address={address} escrowAddress={escrowAddress} chainId={chainId} />
       )}
     </div>
   );

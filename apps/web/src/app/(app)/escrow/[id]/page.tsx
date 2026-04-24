@@ -25,7 +25,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
@@ -72,9 +71,7 @@ export default function EscrowDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <ConnectWall>
-          <EscrowDetail id={BigInt(id)} escrowAddress={escrowAddress} />
-        </ConnectWall>
+        <EscrowDetail id={BigInt(id)} escrowAddress={escrowAddress} />
       )}
     </div>
   );

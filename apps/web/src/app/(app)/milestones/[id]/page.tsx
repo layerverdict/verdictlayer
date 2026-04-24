@@ -31,7 +31,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
@@ -86,9 +85,7 @@ export default function GrantDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <ConnectWall>
-          <GrantDetail id={BigInt(id)} vaultAddress={vaultAddress} />
-        </ConnectWall>
+        <GrantDetail id={BigInt(id)} vaultAddress={vaultAddress} />
       )}
     </div>
   );

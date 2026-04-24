@@ -1,6 +1,5 @@
 "use client";
 
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
@@ -8,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LoginButton } from "./login-button";
 import { VerdictLogo } from "./logo";
 import { cn } from "@/lib/utils";
 
@@ -137,11 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-3">
-            <ConnectButton
-              chainStatus="icon"
-              accountStatus={{ smallScreen: "avatar", largeScreen: "full" }}
-              showBalance={false}
-            />
+            <LoginButton />
           </div>
         </div>
       </header>

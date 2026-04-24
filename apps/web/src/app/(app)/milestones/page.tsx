@@ -14,7 +14,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { PageHeader } from "@/components/verdict/page-header";
 import { formatAmount, formatTimestamp, truncateAddress } from "@/lib/format";
@@ -46,13 +45,11 @@ export default function MilestonesListPage() {
       {!vaultAddress ? (
         <NotDeployed chainId={chainId} />
       ) : (
-        <ConnectWall>
-          <GrantList
-            address={address}
-            vaultAddress={vaultAddress}
-            chainId={chainId}
-          />
-        </ConnectWall>
+        <GrantList
+          address={address}
+          vaultAddress={vaultAddress}
+          chainId={chainId}
+        />
       )}
     </div>
   );

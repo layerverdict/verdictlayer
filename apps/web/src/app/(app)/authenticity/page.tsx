@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { type Address } from "viem";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   useAccount,
   useChainId,
@@ -22,7 +23,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { PageHeader } from "@/components/verdict/page-header";
@@ -58,9 +58,7 @@ export default function AuthenticityPage() {
       {!certifier ? (
         <NotDeployed chainId={chainId} />
       ) : (
-        <ConnectWall>
-          <AuthenticityInner certifier={certifier} chainId={chainId} />
-        </ConnectWall>
+        <AuthenticityInner certifier={certifier} chainId={chainId} />
       )}
     </div>
   );
@@ -98,6 +96,8 @@ function AuthenticityInner({
   );
 }
 
+const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
+
 function SubmitPanel({
   certifier,
   chainId,
@@ -106,6 +106,60 @@ function SubmitPanel({
   chainId: number;
 }) {
   const { address } = useAccount();
+
+  if (!address) {
+    return <SubmitPanelSignedOut />;
+  }
+  return (
+    <SubmitPanelInner certifier={certifier} chainId={chainId} address={address} />
+  );
+}
+
+function SubmitPanelSignedOut() {
+  if (PRIVY_CONFIGURED) return <SubmitPanelSignInPrompt />;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Wallet required</CardTitle>
+        <CardDescription>
+          Connect an EVM wallet to submit a check. You can browse the recent
+          checks on the left without connecting.
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
+
+function SubmitPanelSignInPrompt() {
+  const { login } = usePrivy();
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Sign in to submit</CardTitle>
+        <CardDescription>
+          Email, social, or wallet — we&apos;ll create an embedded wallet for
+          you if you don&apos;t have one. You can still browse the recent
+          checks without signing in.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button onClick={login} className="w-full">
+          Sign in
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SubmitPanelInner({
+  certifier,
+  chainId,
+  address,
+}: {
+  certifier: Address;
+  chainId: number;
+  address: `0x${string}`;
+}) {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
 
@@ -121,7 +175,7 @@ function SubmitPanel({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!assetHash || !referenceHash || !bond.data || !address || !publicClient) return;
+    if (!assetHash || !referenceHash || !bond.data || !publicClient) return;
     try {
       setSubmitting(true);
       const hash = await runTx(
@@ -150,15 +204,12 @@ function SubmitPanel({
   // there's no pre-registered assertion to attach the upload to. Use a
   // deterministic pseudo-assertion so the backend FK resolves; the real
   // verdict assertion is created synchronously inside the submit tx.
-  const pseudoAssertion = useMemo(() => {
-    if (!address) return null;
-    return (
-      "0x" +
-      BigInt(address)
-        .toString(16)
-        .padStart(64, "0")
-    ) as `0x${string}`;
-  }, [address]);
+  const pseudoAssertion = useMemo(
+    () =>
+      ("0x" +
+        BigInt(address).toString(16).padStart(64, "0")) as `0x${string}`,
+    [address],
+  );
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -171,14 +222,12 @@ function SubmitPanel({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {address && pseudoAssertion ? (
-            <EvidenceUploader
-              assertionId={pseudoAssertion}
-              uploader={address}
-              onUploaded={(r) => setAssetHash(r.rootHash)}
-              helper="Image, document, signature — the artefact you want certified."
-            />
-          ) : null}
+          <EvidenceUploader
+            assertionId={pseudoAssertion}
+            uploader={address}
+            onUploaded={(r) => setAssetHash(r.rootHash)}
+            helper="Image, document, signature — the artefact you want certified."
+          />
         </CardContent>
       </Card>
 
@@ -191,14 +240,12 @@ function SubmitPanel({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {address && pseudoAssertion ? (
-            <EvidenceUploader
-              assertionId={pseudoAssertion}
-              uploader={address}
-              onUploaded={(r) => setReferenceHash(r.rootHash)}
-              helper="The ground truth — what the asset is being compared against."
-            />
-          ) : null}
+          <EvidenceUploader
+            assertionId={pseudoAssertion}
+            uploader={address}
+            onUploaded={(r) => setReferenceHash(r.rootHash)}
+            helper="The ground truth — what the asset is being compared against."
+          />
         </CardContent>
       </Card>
 

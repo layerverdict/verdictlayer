@@ -25,7 +25,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
@@ -80,9 +79,7 @@ export default function PolicyDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <ConnectWall>
-          <PolicyDetail id={BigInt(id)} insuranceAddress={insuranceAddress} />
-        </ConnectWall>
+        <PolicyDetail id={BigInt(id)} insuranceAddress={insuranceAddress} />
       )}
     </div>
   );

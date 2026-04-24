@@ -14,7 +14,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { PageHeader } from "@/components/verdict/page-header";
 import { formatAmount, formatTimestamp, truncateAddress } from "@/lib/format";
@@ -50,13 +49,11 @@ export default function InsuranceListPage() {
       {!insuranceAddress ? (
         <NotDeployed chainId={chainId} />
       ) : (
-        <ConnectWall>
-          <PolicyList
-            address={address}
-            insuranceAddress={insuranceAddress}
-            chainId={chainId}
-          />
-        </ConnectWall>
+        <PolicyList
+          address={address}
+          insuranceAddress={insuranceAddress}
+          chainId={chainId}
+        />
       )}
     </div>
   );

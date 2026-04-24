@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { LoginButton } from "@/components/verdict/login-button";
 import { VerdictLogo } from "@/components/verdict/logo";
 import { cn } from "@/lib/utils";
 
@@ -85,12 +86,7 @@ export function MarketingHeader() {
           >
             Launch app
           </Link>
-          <Link
-            href="/escrow"
-            className="rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black shadow-[0_0_20px_rgba(255,255,255,0.15)] transition-all duration-200 hover:bg-white/90 sm:px-5"
-          >
-            Open a case
-          </Link>
+          <LoginButton compact />
         </div>
       </div>
     </nav>

@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ConnectWall } from "@/components/verdict/connect-wall";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
 import {
@@ -67,9 +66,7 @@ export default function CheckDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <ConnectWall>
-          <CheckDetail id={BigInt(id)} certifier={certifier} />
-        </ConnectWall>
+        <CheckDetail id={BigInt(id)} certifier={certifier} />
       )}
     </div>
   );
