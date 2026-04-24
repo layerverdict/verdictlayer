@@ -58,3 +58,9 @@ deployments/hardhat/
 
 # Nested reference repo (0G agent skills from 0gfoundation)
 .0g-skills/
+
+# Local-only planning & agent context (not for public repo)
+plan.md
+0g.md
+CLAUDE.md
+.claude/
