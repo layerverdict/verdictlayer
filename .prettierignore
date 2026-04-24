@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+.next
+out
+artifacts
+cache
+typechain-types
+coverage
+.turbo
+pnpm-lock.yaml
+*.md
+.0g-skills
