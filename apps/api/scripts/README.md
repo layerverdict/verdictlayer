@@ -44,6 +44,11 @@ hands out `0.1 0G` at a time, so the gate needs at least ten top-ups
 (plus gas) before it can run green end-to-end. Partial runs up through
 step 3 (ledger create) are valid smoke tests.
 
+> **Pre-submission TODO.** Re-run the full gate once the wallet is
+> funded past 1.0 0G and paste the passing `[6] processResponse → ✓
+> settled` block into the submission notes. The gate is deliberately
+> idempotent so it can be replayed on demand.
+
 ### Current testnet provider catalogue
 
 Discovered on chain 16602 via `listService()`. Cache these in `.env`
