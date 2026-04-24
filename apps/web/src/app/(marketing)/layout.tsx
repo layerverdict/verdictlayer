@@ -10,7 +10,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
       <BeamsBackground />
       <MarketingHeader />
       <div className="relative z-10">
-        <main>{children}</main>
+        <main id="main" tabIndex={-1}>{children}</main>
         <MarketingFooter />
       </div>
     </div>

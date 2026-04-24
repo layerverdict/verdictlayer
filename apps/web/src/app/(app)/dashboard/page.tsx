@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { AssertionRowCard, type AssertionRow } from "@/components/verdict/assertion-row";
 import { EmptyState } from "@/components/verdict/empty-state";
+import { Counter, Stagger } from "@/components/verdict/motion";
 import { PageHeader } from "@/components/verdict/page-header";
 import { fetcher } from "@/lib/api";
 import { abis } from "@/lib/web3/abis";
@@ -140,7 +141,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {order.map((key) => (
           <AppStatCard
             key={key}
@@ -150,7 +151,7 @@ export default function DashboardPage() {
             loading={isLoading && appData[key].deployed}
           />
         ))}
-      </div>
+      </Stagger>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <section className="space-y-3">
@@ -262,10 +263,15 @@ function AppStatCard({
           <div className="flex items-end gap-2">
             {loading ? (
               <Skeleton className="h-9 w-16" />
-            ) : (
+            ) : !deployed || count === null ? (
               <span className="font-mono text-4xl font-medium tracking-tight text-white">
-                {deployed ? (count ?? "—") : "—"}
+                —
               </span>
+            ) : (
+              <Counter
+                value={count}
+                className="font-mono text-4xl font-medium tracking-tight text-white"
+              />
             )}
             {!deployed ? (
               <Badge variant="warning" className="mb-1">

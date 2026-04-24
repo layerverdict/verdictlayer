@@ -111,6 +111,8 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
       <CardContent className="p-0">
         <div
           ref={transcriptRef}
+          aria-live="polite"
+          aria-label="Judge reasoning transcript"
           className="max-h-[60vh] min-h-[260px] overflow-y-auto px-6 py-6 font-mono text-sm leading-relaxed text-white/80"
         >
           <AnimatePresence initial={false}>

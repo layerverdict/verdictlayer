@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/verdict/empty-state";
+import { Stagger } from "@/components/verdict/motion";
 import { PageHeader } from "@/components/verdict/page-header";
 import { AssertionRowCard, type AssertionRow } from "@/components/verdict/assertion-row";
 import { fetcher } from "@/lib/api";
@@ -129,11 +130,11 @@ export default function HistoryPage() {
               <Badge variant="outline">{APP_LABEL_FILTER[app]}</Badge>
             ) : null}
           </div>
-          <div className="grid gap-3">
+          <Stagger className="grid gap-3" step={0.03}>
             {rows.map((row) => (
               <AssertionRowCard key={row.id} row={row} />
             ))}
-          </div>
+          </Stagger>
         </div>
       )}
     </div>

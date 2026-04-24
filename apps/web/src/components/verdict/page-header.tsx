@@ -1,5 +1,8 @@
+"use client";
+
 import type { ReactNode } from "react";
 
+import { FadeIn } from "@/components/verdict/motion";
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
@@ -18,7 +21,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div
+    <FadeIn
       className={cn(
         "flex flex-col gap-4 border-b border-white/10 pb-8 md:flex-row md:items-end md:justify-between",
         className,
@@ -40,6 +43,6 @@ export function PageHeader({
         ) : null}
       </div>
       {action ? <div className="flex items-center gap-2">{action}</div> : null}
-    </div>
+    </FadeIn>
   );
 }

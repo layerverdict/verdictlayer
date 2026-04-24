@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/verdict/empty-state";
+import { Stagger } from "@/components/verdict/motion";
 import { PageHeader } from "@/components/verdict/page-header";
 import { truncateAddress } from "@/lib/format";
 import { abis } from "@/lib/web3/abis";
@@ -128,7 +129,7 @@ function JudgeGallery({
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {ids.map((tokenId, idx) => {
         const ownerRes = ownerReads.data?.[idx];
         const repRes = repReads.data?.[idx];
@@ -156,7 +157,7 @@ function JudgeGallery({
           />
         );
       })}
-    </div>
+    </Stagger>
   );
 }
 

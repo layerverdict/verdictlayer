@@ -1,10 +1,13 @@
 "use client";
 
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { VerdictLogo } from "./logo";
 import { cn } from "@/lib/utils";
 
@@ -102,13 +105,16 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="relative flex min-h-screen flex-col bg-black text-white">
       <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-black/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-3">
-            <VerdictLogo className="text-white" />
-            <span className="text-lg font-semibold tracking-tight">Verdict</span>
-            <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/40 md:inline-block">
-              Mainnet
-            </span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <MobileNav pathname={pathname} />
+            <Link href="/" className="flex items-center gap-3">
+              <VerdictLogo className="text-white" />
+              <span className="text-lg font-semibold tracking-tight">Verdict</span>
+              <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/40 md:inline-block">
+                Mainnet
+              </span>
+            </Link>
+          </div>
 
           <nav className="hidden items-center gap-1 md:flex">
             {NAV.filter((item) => APPS_SET.has(item.icon)).map((item) => {
@@ -141,7 +147,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex flex-1">
-        {/* Sidebar — shows only on md+ when we're on an app page */}
         <aside className="hidden w-60 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:block">
           <SidebarSection
             label="Overview"
@@ -172,7 +177,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main className="flex-1 overflow-x-hidden">
+        <main id="main" className="flex-1 overflow-x-hidden" tabIndex={-1}>
           <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
             {children}
           </div>
@@ -186,10 +191,12 @@ function SidebarSection({
   label,
   items,
   pathname,
+  onNavigate,
 }: {
   label: string;
   items: NavItem[];
   pathname: string | null | undefined;
+  onNavigate?: () => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -204,6 +211,7 @@ function SidebarSection({
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active
@@ -218,5 +226,85 @@ function SidebarSection({
         })}
       </nav>
     </div>
+  );
+}
+
+function MobileNav({ pathname }: { pathname: string | null }) {
+  const [open, setOpen] = useState(false);
+
+  // Close drawer whenever the route changes.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
+      <DialogPrimitive.Trigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Open navigation"
+          className="md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+      </DialogPrimitive.Trigger>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 md:hidden" />
+        <DialogPrimitive.Content
+          aria-label="Navigation"
+          className={cn(
+            "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/10 bg-[#0a0a0a] p-4 shadow-[20px_0_80px_-20px_rgba(0,0,0,0.8)] md:hidden",
+            "data-[state=open]:animate-in data-[state=open]:slide-in-from-left",
+            "data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left",
+          )}
+        >
+          <div className="mb-6 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
+              <VerdictLogo className="text-white" />
+              <span className="text-base font-semibold tracking-tight">Verdict</span>
+            </Link>
+            <DialogPrimitive.Close asChild>
+              <Button variant="ghost" size="icon" aria-label="Close navigation">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogPrimitive.Close>
+          </div>
+          <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
+          <div className="flex-1 overflow-y-auto">
+            <SidebarSection
+              label="Overview"
+              items={NAV.filter((n) => n.icon === "dashboard")}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <SidebarSection
+              label="Applications"
+              items={NAV.filter((n) => APPS_SET.has(n.icon))}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+            <SidebarSection
+              label="Protocol"
+              items={NAV.filter((n) => n.icon === "judges" || n.icon === "history")}
+              pathname={pathname}
+              onNavigate={() => setOpen(false)}
+            />
+          </div>
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-white/30">
+              Status
+            </div>
+            <div className="flex items-center gap-2 text-xs text-white/60">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-50" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+              </span>
+              Registry online
+            </div>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
