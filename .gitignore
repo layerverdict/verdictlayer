@@ -46,6 +46,8 @@ Thumbs.db
 # Hardhat
 deployments/localhost/
 deployments/hardhat/
+# Local hardhat-network deploy manifest is ephemeral; only keep real-network ones.
+packages/shared/deployments/31337.json
 
 # Testing
 .nyc_output/
