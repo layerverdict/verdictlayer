@@ -43,7 +43,7 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
         bytes32 assertionId;
     }
 
-    uint256 public assertionBond;
+    uint256 public immutable assertionBond;
     uint256 private _nextPolicyId = 1;
     mapping(uint256 policyId => Policy) private _policies;
 

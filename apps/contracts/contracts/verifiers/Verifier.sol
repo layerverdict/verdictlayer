@@ -62,9 +62,14 @@ contract Verifier is BaseVerifier {
     error OracleTypeMismatch(VerifierType expected, bool gotTEE);
     error InvalidDataHashLength(uint256 given);
 
-    event VerifierDeployed(address attestationContract, VerifierType verifierType);
+    event VerifierDeployed(address indexed attestationContract, VerifierType indexed verifierType);
 
     constructor(address _attestationContract, VerifierType _verifierType) {
+        // attestationContract may legitimately be the zero address: the v1
+        // verifier intentionally defers deep TEE / ZKP attestation check to
+        // a drop-in replacement contract (swapped in via
+        // ReputationRegistry.updateVerifier). Zero here means "signature
+        // check only" and is the expected default on first deploy.
         attestationContract = _attestationContract;
         verifierType = _verifierType;
         emit VerifierDeployed(_attestationContract, _verifierType);

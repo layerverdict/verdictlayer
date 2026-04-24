@@ -54,8 +54,9 @@ contract Escrow is VerdictConsumer, ReentrancyGuard {
     uint64 public constant EXPIRY_AFTER_DEADLINE = 30 days;
 
     /// @notice Bond the escrow contract itself posts when creating a Verdict
-    ///         assertion. Protects the registry from spam. Configurable.
-    uint256 public assertionBond;
+    ///         assertion. Protects the registry from spam. Fixed per deploy
+    ///         so dispute-opening quotes are predictable to the UI.
+    uint256 public immutable assertionBond;
 
     uint256 private _nextEscrowId = 1;
     mapping(uint256 escrowId => EscrowRecord) private _escrows;

@@ -37,7 +37,7 @@ contract AuthenticityCertifier is VerdictConsumer, ReentrancyGuard {
         uint64 decidedAt;
     }
 
-    uint256 public assertionBond;
+    uint256 public immutable assertionBond;
     uint256 private _nextCheckId = 1;
     mapping(uint256 checkId => Check) private _checks;
 

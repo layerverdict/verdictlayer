@@ -221,7 +221,7 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
         bytes32 reasoningRoot,
         bytes32 attestationHash,
         uint256 judgeTokenId
-    ) external override onlyRole(JUDGE_ROLE) {
+    ) external override onlyRole(JUDGE_ROLE) nonReentrant {
         if (outcome == Outcome.PENDING || outcome == Outcome.ESCALATED) {
             revert OutcomeCannotBePending();
         }

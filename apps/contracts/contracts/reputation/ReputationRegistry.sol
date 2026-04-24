@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import {IERC7857} from "../interfaces/IERC7857.sol";
 import {IERC7857Metadata} from "../interfaces/IERC7857Metadata.sol";
@@ -30,7 +31,12 @@ import {
 ///      (github.com/0gfoundation/0g-agent-nft, branch eip-7857-draft) with
 ///      the upgradeable storage-slot machinery removed and the reputation
 ///      layer added.
-contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metadata {
+contract ReputationRegistry is
+    AccessControlEnumerable,
+    ReentrancyGuard,
+    IERC7857,
+    IERC7857Metadata
+{
     // ─────────────────────────────────────────────────────────────────────
     // Types
     // ─────────────────────────────────────────────────────────────────────
@@ -130,6 +136,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
     error ReceiverMismatch(uint256 index, address expected, address actual);
     error OldDataHashMismatch(uint256 index, bytes32 expected, bytes32 actual);
     error NewDataHashMismatch(uint256 index, bytes32 expected, bytes32 actual);
+    error MintFeeNotAccepted();
 
     // ─────────────────────────────────────────────────────────────────────
     // Construction
@@ -190,7 +197,11 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
         bytes[] calldata proofs,
         string[] calldata dataDescriptions,
         address to
-    ) external payable returns (uint256 tokenId) {
+    ) external payable nonReentrant returns (uint256 tokenId) {
+        // Interface is payable for forward-compat with fee-charging
+        // implementations, but v1 does not levy a mint fee. Refuse
+        // non-zero values outright so no ether can get locked.
+        if (msg.value != 0) revert MintFeeNotAccepted();
         if (dataDescriptions.length != proofs.length) {
             revert ProofsDescriptionsLengthMismatch(proofs.length, dataDescriptions.length);
         }
@@ -230,7 +241,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
         address to,
         uint256 tokenId,
         bytes[] calldata proofs
-    ) external {
+    ) external nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         TokenData storage token = _tokens[tokenId];
         if (token.owner != msg.sender) revert NotOwner();
@@ -245,7 +256,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
         address to,
         uint256 tokenId,
         bytes[] calldata proofs
-    ) external {
+    ) external nonReentrant {
         if (to == address(0)) revert ZeroAddress();
         TokenData storage token = _tokens[tokenId];
         if (token.owner != from) revert NotOwner();
@@ -265,7 +276,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
         address to,
         uint256 tokenId,
         bytes[] calldata proofs
-    ) external returns (uint256 newTokenId) {
+    ) external nonReentrant returns (uint256 newTokenId) {
         if (to == address(0)) revert ZeroAddress();
         TokenData storage source = _tokens[tokenId];
         if (source.owner != msg.sender) revert NotOwner();
@@ -280,7 +291,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
         address to,
         uint256 tokenId,
         bytes[] calldata proofs
-    ) external returns (uint256 newTokenId) {
+    ) external nonReentrant returns (uint256 newTokenId) {
         if (to == address(0)) revert ZeroAddress();
         TokenData storage source = _tokens[tokenId];
         if (source.owner != from) revert NotOwner();
@@ -376,7 +387,7 @@ contract ReputationRegistry is AccessControlEnumerable, IERC7857, IERC7857Metada
     }
 
     /// @inheritdoc IERC7857Metadata
-    function update(uint256 tokenId, bytes[] calldata proofs) external {
+    function update(uint256 tokenId, bytes[] calldata proofs) external nonReentrant {
         TokenData storage token = _tokens[tokenId];
         if (token.owner != msg.sender) revert NotOwner();
 

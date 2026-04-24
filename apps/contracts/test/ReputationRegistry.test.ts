@@ -220,6 +220,16 @@ describe("ReputationRegistry — mint", () => {
     expect(m1.tokenId).to.equal(0n);
     expect(m2.tokenId).to.equal(1n);
   });
+
+  it("reverts when a caller attaches native value to mint()", async () => {
+    const { registry, alice } = await loadFixture(deployFixture);
+    const hash = "0x" + "ef".repeat(32);
+    await expect(
+      registry
+        .connect(alice)
+        .mint([preimageProof(hash)], ["desc"], alice.address, { value: 1n }),
+    ).to.be.revertedWithCustomError(registry, "MintFeeNotAccepted");
+  });
 });
 
 // ───────────────────────── transfer ─────────────────────────

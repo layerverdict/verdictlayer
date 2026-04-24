@@ -53,7 +53,7 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
         Milestone[] milestones;
     }
 
-    uint256 public assertionBond;
+    uint256 public immutable assertionBond;
     uint256 private _nextGrantId = 1;
     mapping(uint256 grantId => Grant) private _grants;
 
