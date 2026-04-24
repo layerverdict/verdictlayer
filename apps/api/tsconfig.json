@@ -12,11 +12,10 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "outDir": "dist",
-    "rootDir": "src",
     "declaration": false,
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }

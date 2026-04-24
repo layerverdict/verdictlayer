@@ -15,9 +15,12 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
 
+  QWEN_CHAT_PROVIDER: z.string().optional(),
+  QWEN_IMAGE_PROVIDER: z.string().optional(),
   GLM5_PROVIDER: z.string().optional(),
   DEEPSEEK_PROVIDER: z.string().optional(),
   QWEN3_PROVIDER: z.string().optional(),
+  OG_INFERENCE_CONTRACT: z.string().optional(),
 
   SENTRY_DSN: z.string().optional(),
 });
