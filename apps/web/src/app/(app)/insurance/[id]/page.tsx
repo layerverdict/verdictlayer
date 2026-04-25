@@ -3,8 +3,14 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { type Address } from "viem";
-import { useAccount, useChainId, useReadContract, useWriteContract } from "wagmi";
+import { type Address, decodeEventLog } from "viem";
+import {
+  useAccount,
+  useChainId,
+  usePublicClient,
+  useReadContract,
+  useWriteContract,
+} from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,9 +35,11 @@ import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
+import { attachEvidence } from "@/lib/api";
 import {
   formatAmount,
   formatTimestamp,
+  isZeroHash,
   truncateAddress,
   truncateHash,
 } from "@/lib/format";
@@ -50,8 +58,34 @@ import { runTx } from "@/lib/web3/tx";
 
 export default function PolicyDetailPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? "0";
+  const rawId = params?.id ?? "";
   const insuranceAddress = maybeContractAddress("parametricInsurance");
+
+  let parsedId: bigint | null = null;
+  try {
+    if (/^\d+$/.test(rawId)) parsedId = BigInt(rawId);
+  } catch {
+    parsedId = null;
+  }
+
+  if (!parsedId || parsedId <= 0n) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Policy"
+          title="Not found"
+          description="That policy id isn't a positive integer."
+          action={
+            <Button variant="ghost" asChild>
+              <Link href="/insurance">Back to list</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const id = parsedId;
 
   return (
     <div className="space-y-8">
@@ -79,7 +113,7 @@ export default function PolicyDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <PolicyDetail id={BigInt(id)} insuranceAddress={insuranceAddress} />
+        <PolicyDetail id={id} insuranceAddress={insuranceAddress} />
       )}
     </div>
   );
@@ -125,10 +159,7 @@ function PolicyDetail({
         ? "holder"
         : "observer";
 
-  const activeAssertion =
-    policy.assertionId && policy.assertionId !== "0x" + "0".repeat(64)
-      ? policy.assertionId
-      : null;
+  const activeAssertion = isZeroHash(policy.assertionId) ? null : policy.assertionId;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -153,8 +184,7 @@ function PolicyDetail({
             <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/80">
               {policy.condition || "—"}
             </pre>
-            {policy.evidenceSpec &&
-            policy.evidenceSpec !== "0x" + "0".repeat(64) ? (
+            {!isZeroHash(policy.evidenceSpec) ? (
               <div className="mt-3 font-mono text-[11px] text-white/40">
                 evidence spec · {truncateHash(policy.evidenceSpec, 12, 10)}
               </div>
@@ -233,16 +263,14 @@ function OverviewCard({
           label="Coverage end"
           value={formatTimestamp(Number(policy.coverageEnd) * 1000)}
         />
-        {policy.assertionId &&
-        policy.assertionId !== "0x" + "0".repeat(64) ? (
+        {!isZeroHash(policy.assertionId) ? (
           <Field
             label="Assertion"
             value={truncateHash(policy.assertionId, 8, 6)}
             mono
           />
         ) : null}
-        {policy.claimEvidence &&
-        policy.claimEvidence !== "0x" + "0".repeat(64) ? (
+        {!isZeroHash(policy.claimEvidence) ? (
           <Field
             label="Claim evidence"
             value={truncateHash(policy.claimEvidence, 8, 6)}
@@ -428,17 +456,16 @@ function ClaimDialog({
   onDone: () => void;
 }) {
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
   const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const pseudoAssertion = (`0x${id.toString(16).padStart(64, "0")}`) as `0x${string}`;
-
   async function submit() {
-    if (!rootHash) return;
+    if (!rootHash || !publicClient) return;
     try {
       setSubmitting(true);
-      await runTx(
+      const hash = await runTx(
         writeContractAsync({
           address: insuranceAddress,
           abi: abis.parametricInsurance,
@@ -452,6 +479,39 @@ function ClaimDialog({
           success: "Claim filed",
         },
       );
+
+      // ClaimOpened carries the assertionId; attach the raw upload so
+      // the judgment worker can pull evidence metadata by assertion.
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      let assertionId: `0x${string}` | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: abis.parametricInsurance,
+            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+            data: log.data,
+          });
+          if (
+            decoded.eventName === "ClaimOpened" &&
+            decoded.args &&
+            "assertionId" in decoded.args
+          ) {
+            assertionId = (decoded.args as { assertionId: `0x${string}` }).assertionId;
+            break;
+          }
+        } catch {
+          // Not a ParametricInsurance log — skip.
+        }
+      }
+
+      if (assertionId) {
+        try {
+          await attachEvidence({ rootHash, assertionId, uploader: holder });
+        } catch (err) {
+          console.warn("attachEvidence failed", err);
+        }
+      }
+
       onDone();
       setOpen(false);
       setRootHash(null);
@@ -475,7 +535,6 @@ function ClaimDialog({
           </DialogDescription>
         </DialogHeader>
         <EvidenceUploader
-          assertionId={pseudoAssertion}
           uploader={holder}
           onUploaded={(res) => setRootHash(res.rootHash)}
         />

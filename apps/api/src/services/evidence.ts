@@ -10,13 +10,14 @@
  * the assertion row exists before evidence is attached.
  */
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { db, schema } from "../db/client.js";
 import { uploadBuffer, uploadStream, type UploadResult } from "./storage.js";
 
 export interface RegisterEvidenceInput {
-  assertionId: `0x${string}`;
+  /** Null for pre-assertion (raw) uploads; attached later by `attachEvidence`. */
+  assertionId: `0x${string}` | null;
   uploader: `0x${string}`;
   rootHash: `0x${string}`;
   size: number;
@@ -60,6 +61,31 @@ export async function uploadAndRegister(
   });
 
   return { evidence, upload };
+}
+
+/**
+ * Attach a previously-uploaded raw evidence row (`assertionId === null`)
+ * to an assertion, typically once the on-chain tx has landed and the
+ * indexer has mirrored the AssertionCreated event. Idempotent: if the
+ * row is already attached to the target assertion, it stays put.
+ */
+export async function attachEvidence(
+  rootHash: `0x${string}`,
+  assertionId: `0x${string}`,
+  uploader: `0x${string}`,
+): Promise<number> {
+  const result = await db
+    .update(schema.evidence)
+    .set({ assertionId })
+    .where(
+      and(
+        eq(schema.evidence.rootHash, rootHash),
+        eq(schema.evidence.uploader, uploader),
+        isNull(schema.evidence.assertionId),
+      ),
+    )
+    .returning({ id: schema.evidence.id });
+  return result.length;
 }
 
 export async function listEvidenceByAssertion(assertionId: `0x${string}`) {

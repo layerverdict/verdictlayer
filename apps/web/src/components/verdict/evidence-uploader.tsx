@@ -16,7 +16,10 @@ type UploadedEvidence = {
 };
 
 interface EvidenceUploaderProps {
-  assertionId: `0x${string}`;
+  /** Optional. Omit for pre-tx uploads — the evidence row lands with a
+   *  null assertion and should be attached via `attachEvidence` after
+   *  the createEscrow / openDispute / claim tx lands on-chain. */
+  assertionId?: `0x${string}`;
   uploader: `0x${string}`;
   onUploaded(evidence: UploadedEvidence): void;
   helper?: string;
@@ -24,8 +27,8 @@ interface EvidenceUploaderProps {
 
 /**
  * Drag-drop evidence uploader. Hits `POST /api/evidence` with
- * multipart/form-data — the field ORDER matters: assertionId + uploader
- * must land before the file part for busboy to surface them.
+ * multipart/form-data — the field ORDER matters: uploader + optional
+ * assertionId must land before the file part for busboy to surface them.
  */
 export function EvidenceUploader({
   assertionId,
@@ -63,8 +66,10 @@ export function EvidenceUploader({
 
     start(async () => {
       const form = new FormData();
-      // Fields FIRST — @fastify/multipart surfaces fields parsed BEFORE the file.
-      form.append("assertionId", assertionId);
+      // Fields FIRST — @fastify/multipart surfaces fields parsed BEFORE
+      // the file. assertionId is optional; leave it off for pre-tx
+      // uploads and attach later.
+      if (assertionId) form.append("assertionId", assertionId);
       form.append("uploader", uploader);
       form.append("file", file, file.name);
 

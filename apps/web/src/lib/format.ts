@@ -1,5 +1,14 @@
 import { formatUnits } from "viem";
 
+/** Canonical empty bytes32 — used as the "unset" sentinel in every
+ *  Verdict contract struct (deliveryEvidence, assertionId, …). */
+export const ZERO_BYTES32 =
+  "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
+
+export function isZeroHash(value: string | null | undefined): boolean {
+  return !value || value.toLowerCase() === ZERO_BYTES32;
+}
+
 export function truncateHash(value: string, head = 6, tail = 4): string {
   if (!value) return "";
   if (value.length <= head + tail + 3) return value;

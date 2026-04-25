@@ -15,6 +15,13 @@
       "when": 1777054927932,
       "tag": "0001_mature_wendell_rand",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777153621166,
+      "tag": "0002_friendly_loners",
+      "breakpoints": true
     }
   ]
 }

@@ -71,3 +71,36 @@ export const apiBaseUrl = BASE_URL;
 
 // SWR fetcher — the default.
 export const fetcher = <T = unknown>(path: string) => api<T>(path);
+
+/**
+ * Attach a previously-uploaded raw evidence row (`assertionId === null`)
+ * to an assertion, typically once the on-chain tx has confirmed and the
+ * indexer has mirrored the AssertionCreated event.
+ *
+ * Retries a couple of times with backoff because the indexer lag between
+ * tx confirmation and the event landing in Postgres can be a few seconds.
+ */
+export async function attachEvidence(input: {
+  rootHash: `0x${string}`;
+  assertionId: `0x${string}`;
+  uploader: `0x${string}`;
+}): Promise<{ attached: number }> {
+  const maxAttempts = 5;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await api<{ attached: number }>("/api/evidence/attach", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+    } catch (err) {
+      const isLag = err instanceof ApiError && err.status === 409;
+      if (isLag && attempt < maxAttempts) {
+        // Indexer hasn't caught up yet — wait a bit and retry.
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("attachEvidence exhausted retries");
+}

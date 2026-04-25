@@ -1,7 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
-import { uploadAndRegister, listEvidenceByAssertion } from "../services/evidence.js";
+import {
+  attachEvidence,
+  uploadAndRegister,
+  listEvidenceByAssertion,
+} from "../services/evidence.js";
 import { verifyRootHash } from "../services/storage.js";
 import { getAssertion } from "../services/assertion.js";
 
@@ -20,18 +24,27 @@ const RootHashSchema = z
 /**
  * Evidence routes.
  *
- *   POST   /api/evidence           multipart upload, body fields:
- *     - file          (binary)     required
- *     - assertionId   (text)       required, 0x-prefixed 32-byte hex
- *     - uploader      (text)       required, 0x-prefixed 20-byte hex
- *     - metadata      (text)       optional, JSON string
+ *   POST   /api/evidence                multipart upload; body fields:
+ *     - file          (binary)          required
+ *     - uploader      (text)            required, 0x-prefixed 20-byte hex
+ *     - assertionId   (text)            optional, 0x-prefixed 32-byte hex
+ *                                       (omit for pre-tx raw uploads —
+ *                                        attach later with /attach)
+ *     - metadata      (text)            optional, JSON string
  *
- *   GET    /api/evidence/:assertionId   list evidence for an assertion
- *   GET    /api/evidence/verify/:root   confirm a root hash resolves
+ *   POST   /api/evidence/attach          attach a raw upload to an assertion
+ *     body: { rootHash, assertionId, uploader }
+ *
+ *   GET    /api/evidence/:assertionId    list evidence for an assertion
+ *   GET    /api/evidence/verify/:root    confirm a root hash resolves
  */
 export const evidenceRoutes: FastifyPluginAsync = async (app) => {
   const UploadBody = z.object({
-    assertionId: AssertionIdSchema,
+    // assertionId is now optional so the client can upload BEFORE the
+    // on-chain tx that creates the assertion (standard flow for the
+    // escrow/insurance/milestone apps). Rows without an assertion are
+    // attached once the tx lands.
+    assertionId: AssertionIdSchema.optional(),
     uploader: AddressSchema,
     metadata: z.record(z.unknown()).optional(),
   });
@@ -86,7 +99,7 @@ export const evidenceRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const parsed = UploadBody.safeParse({
-        assertionId: fields.assertionId,
+        assertionId: fields.assertionId || undefined,
         uploader: fields.uploader,
         metadata: parsedMetadata,
       });
@@ -97,21 +110,22 @@ export const evidenceRoutes: FastifyPluginAsync = async (app) => {
 
       const { assertionId, uploader, metadata } = parsed.data;
 
-      // FK: evidence.assertion_id references assertions.id. If the
-      // indexer hasn't mirrored the AssertionCreated event yet, the
-      // insert will fail — surface a 409 instead of bubbling the raw
-      // Postgres error.
-      const assertion = await getAssertion(assertionId as `0x${string}`);
-      if (!assertion) {
-        drain();
-        return reply.code(409).send({
-          error: "assertion not yet mirrored — wait for the indexer to catch up",
-        });
+      // If an assertionId was supplied, make sure the indexer has
+      // already mirrored it — otherwise the FK insert will bail with
+      // a confusing Postgres error.
+      if (assertionId) {
+        const assertion = await getAssertion(assertionId as `0x${string}`);
+        if (!assertion) {
+          drain();
+          return reply.code(409).send({
+            error: "assertion not yet mirrored — wait for the indexer to catch up",
+          });
+        }
       }
 
       consumed = true;
       const { evidence, upload } = await uploadAndRegister({
-        assertionId: assertionId as `0x${string}`,
+        assertionId: (assertionId as `0x${string}` | undefined) ?? null,
         uploader: uploader as `0x${string}`,
         mime: mp.mimetype,
         metadata,
@@ -124,6 +138,34 @@ export const evidenceRoutes: FastifyPluginAsync = async (app) => {
       drain();
       throw err;
     }
+  });
+
+  const AttachBody = z.object({
+    rootHash: RootHashSchema,
+    assertionId: AssertionIdSchema,
+    uploader: AddressSchema,
+  });
+
+  app.post("/api/evidence/attach", async (req, reply) => {
+    const parsed = AttachBody.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid body", issues: parsed.error.issues });
+    }
+    const { rootHash, assertionId, uploader } = parsed.data;
+
+    const assertion = await getAssertion(assertionId as `0x${string}`);
+    if (!assertion) {
+      return reply.code(409).send({
+        error: "assertion not yet mirrored — wait for the indexer to catch up",
+      });
+    }
+
+    const updated = await attachEvidence(
+      rootHash as `0x${string}`,
+      assertionId as `0x${string}`,
+      uploader as `0x${string}`,
+    );
+    return reply.code(200).send({ attached: updated });
   });
 
   app.get<{ Params: { assertionId: string } }>(

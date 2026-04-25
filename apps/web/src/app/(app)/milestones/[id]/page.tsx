@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
-import { type Address } from "viem";
+import { type Address, decodeEventLog } from "viem";
 import {
   useAccount,
   useChainId,
+  usePublicClient,
   useReadContract,
   useReadContracts,
   useWriteContract,
@@ -34,9 +35,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
+import { attachEvidence } from "@/lib/api";
 import {
   formatAmount,
   formatTimestamp,
+  isZeroHash,
   truncateAddress,
   truncateHash,
 } from "@/lib/format";
@@ -56,8 +59,34 @@ import { runTx } from "@/lib/web3/tx";
 
 export default function GrantDetailPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? "0";
+  const rawId = params?.id ?? "";
   const vaultAddress = maybeContractAddress("milestoneVault");
+
+  let parsedId: bigint | null = null;
+  try {
+    if (/^\d+$/.test(rawId)) parsedId = BigInt(rawId);
+  } catch {
+    parsedId = null;
+  }
+
+  if (!parsedId || parsedId <= 0n) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Grant"
+          title="Not found"
+          description="That grant id isn't a positive integer."
+          action={
+            <Button variant="ghost" asChild>
+              <Link href="/milestones">Back to list</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const id = parsedId;
 
   return (
     <div className="space-y-8">
@@ -85,7 +114,7 @@ export default function GrantDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <GrantDetail id={BigInt(id)} vaultAddress={vaultAddress} />
+        <GrantDetail id={id} vaultAddress={vaultAddress} />
       )}
     </div>
   );
@@ -403,9 +432,7 @@ function MilestoneCard({
 }) {
   const status = decodeMilestoneStatus(milestone.status);
   const assertionId =
-    milestone.assertionId && milestone.assertionId !== "0x" + "0".repeat(64)
-      ? milestone.assertionId
-      : null;
+    isZeroHash(milestone.assertionId) ? null : milestone.assertionId;
 
   const canSubmit =
     role === "grantee" &&
@@ -433,8 +460,7 @@ function MilestoneCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        {milestone.evidenceRoot &&
-        milestone.evidenceRoot !== "0x" + "0".repeat(64) ? (
+        {!isZeroHash(milestone.evidenceRoot) ? (
           <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 font-mono text-[11px] text-white/60">
             evidence · {truncateHash(milestone.evidenceRoot, 12, 10)}
           </div>
@@ -495,21 +521,16 @@ function MilestoneSubmitDialog({
   isResubmit: boolean;
 }) {
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
   const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const pseudoAssertion = (`0x${(
-    (grantId << 32n) | BigInt(milestoneIndex)
-  )
-    .toString(16)
-    .padStart(64, "0")}`) as `0x${string}`;
-
   async function submit() {
-    if (!rootHash) return;
+    if (!rootHash || !publicClient) return;
     try {
       setSubmitting(true);
-      await runTx(
+      const hash = await runTx(
         writeContractAsync({
           address: vaultAddress,
           abi: abis.milestoneVault,
@@ -525,6 +546,39 @@ function MilestoneSubmitDialog({
           success: "Milestone submitted",
         },
       );
+
+      // MilestoneSubmitted embeds the assertionId; decode it and attach
+      // the previously-uploaded raw evidence row.
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      let assertionId: `0x${string}` | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: abis.milestoneVault,
+            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+            data: log.data,
+          });
+          if (
+            decoded.eventName === "MilestoneSubmitted" &&
+            decoded.args &&
+            "assertionId" in decoded.args
+          ) {
+            assertionId = (decoded.args as { assertionId: `0x${string}` }).assertionId;
+            break;
+          }
+        } catch {
+          // Not a MilestoneVault log — skip.
+        }
+      }
+
+      if (assertionId) {
+        try {
+          await attachEvidence({ rootHash, assertionId, uploader: grantee });
+        } catch (err) {
+          console.warn("attachEvidence failed", err);
+        }
+      }
+
       onDone();
       setOpen(false);
       setRootHash(null);
@@ -552,7 +606,6 @@ function MilestoneSubmitDialog({
           </DialogDescription>
         </DialogHeader>
         <EvidenceUploader
-          assertionId={pseudoAssertion}
           uploader={grantee}
           onUploaded={(res) => setRootHash(res.rootHash)}
         />

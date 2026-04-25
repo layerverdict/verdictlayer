@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { type Address } from "viem";
+import { toast } from "sonner";
+import { type Address, decodeEventLog } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
 import {
   useAccount,
@@ -26,6 +27,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { PageHeader } from "@/components/verdict/page-header";
+import { attachEvidence } from "@/lib/api";
 import {
   formatAmount,
   formatRelative,
@@ -175,7 +177,24 @@ function SubmitPanelInner({
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!assetHash || !referenceHash || !bond.data || !publicClient) return;
+
+    if (!publicClient) {
+      toast.error("Wallet not ready");
+      return;
+    }
+    if (!assetHash) {
+      toast.error("Upload the asset before submitting");
+      return;
+    }
+    if (!referenceHash) {
+      toast.error("Upload the reference before submitting");
+      return;
+    }
+    if (!bond.data) {
+      toast.error("Couldn't read the assertion bond");
+      return;
+    }
+
     try {
       setSubmitting(true);
       const hash = await runTx(
@@ -192,24 +211,48 @@ function SubmitPanelInner({
           success: "Check submitted",
         },
       );
-      await publicClient.waitForTransactionReceipt({ hash });
+
+      // Parse the real assertionId out of CheckSubmitted and attach
+      // both raw evidence rows to it (asset + reference).
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      let assertionId: `0x${string}` | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: abis.authenticityCertifier,
+            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+            data: log.data,
+          });
+          if (
+            decoded.eventName === "CheckSubmitted" &&
+            decoded.args &&
+            "assertionId" in decoded.args
+          ) {
+            assertionId = (decoded.args as { assertionId: `0x${string}` }).assertionId;
+            break;
+          }
+        } catch {
+          // Not an Authenticity log — skip.
+        }
+      }
+
+      if (assertionId) {
+        const attaches = [
+          attachEvidence({ rootHash: assetHash, assertionId, uploader: address }),
+          attachEvidence({ rootHash: referenceHash, assertionId, uploader: address }),
+        ];
+        const results = await Promise.allSettled(attaches);
+        for (const r of results) {
+          if (r.status === "rejected") console.warn("attachEvidence failed", r.reason);
+        }
+      }
+
       setAssetHash(null);
       setReferenceHash(null);
     } finally {
       setSubmitting(false);
     }
   }
-
-  // Authenticity's `submitCheck` only takes the two hashes directly —
-  // there's no pre-registered assertion to attach the upload to. Use a
-  // deterministic pseudo-assertion so the backend FK resolves; the real
-  // verdict assertion is created synchronously inside the submit tx.
-  const pseudoAssertion = useMemo(
-    () =>
-      ("0x" +
-        BigInt(address).toString(16).padStart(64, "0")) as `0x${string}`,
-    [address],
-  );
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -223,7 +266,6 @@ function SubmitPanelInner({
         </CardHeader>
         <CardContent>
           <EvidenceUploader
-            assertionId={pseudoAssertion}
             uploader={address}
             onUploaded={(r) => setAssetHash(r.rootHash)}
             helper="Image, document, signature — the artefact you want certified."
@@ -241,7 +283,6 @@ function SubmitPanelInner({
         </CardHeader>
         <CardContent>
           <EvidenceUploader
-            assertionId={pseudoAssertion}
             uploader={address}
             onUploaded={(r) => setReferenceHash(r.rootHash)}
             helper="The ground truth — what the asset is being compared against."

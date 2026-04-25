@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { type Address, erc20Abi, parseUnits } from "viem";
+import { toast } from "sonner";
+import { type Address, decodeEventLog, erc20Abi, parseUnits } from "viem";
 import {
   useAccount,
   useChainId,
@@ -85,24 +86,48 @@ function NewEscrowForm({ escrowAddress }: { escrowAddress: Address }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!publicClient || !account) return;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(freelancer)) return;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return;
-    if (!amount || !scope) return;
+
+    if (!publicClient || !account) {
+      toast.error("Wallet not ready");
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(freelancer)) {
+      toast.error("Freelancer address is malformed");
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(token)) {
+      toast.error("Token address is malformed");
+      return;
+    }
+    if (!scope.trim()) {
+      toast.error("Scope can't be empty");
+      return;
+    }
+
     const deadlineTs = Math.floor(new Date(deadline).getTime() / 1000);
-    if (deadlineTs <= Math.floor(Date.now() / 1000)) return;
+    if (Number.isNaN(deadlineTs) || deadlineTs <= Math.floor(Date.now() / 1000)) {
+      toast.error("Deadline must be a future date");
+      return;
+    }
 
     let amountBi: bigint;
     try {
       amountBi = parseUnits(amount, tokenDecimals);
     } catch {
+      toast.error("Amount is not a valid number");
+      return;
+    }
+    if (amountBi <= 0n) {
+      toast.error("Amount must be greater than zero");
       return;
     }
 
     try {
       setSubmitting(true);
 
-      // Approve the escrow to pull `amount` tokens.
+      // Approve the escrow to pull `amount` tokens. Wait for the receipt
+      // so the subsequent createEscrow call doesn't race a stale
+      // allowance (see runTx.waitFor).
       const allowance = await publicClient.readContract({
         address: token as Address,
         abi: erc20Abi,
@@ -122,6 +147,7 @@ function NewEscrowForm({ escrowAddress }: { escrowAddress: Address }) {
             pending: "Approving token transfer…",
             success: "Approval confirmed",
             error: "Approval failed",
+            waitFor: publicClient,
           },
         );
       }
@@ -147,22 +173,48 @@ function NewEscrowForm({ escrowAddress }: { escrowAddress: Address }) {
         },
       );
 
+      // Parse the new escrow id out of the EscrowCreated event — avoids
+      // the race where two concurrent creates would both read the
+      // post-tx `totalEscrows()` and end up on the same detail page.
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      // `createEscrow` returns the new ID; derive it from `totalEscrows`
-      // after the tx confirms — simplest way without decoding the event.
-      const total = (await publicClient.readContract({
-        address: escrowAddress,
-        abi: abis.escrow,
-        functionName: "totalEscrows",
-      })) as bigint;
-
-      if (receipt.status === "success") {
-        router.push(`/escrow/${total.toString()}`);
+      if (receipt.status !== "success") {
+        toast.error("Create escrow reverted on-chain");
+        return;
+      }
+      const newId = readCreatedEscrowId(receipt.logs);
+      if (newId) {
+        router.push(`/escrow/${newId.toString()}`);
+      } else {
+        // Fallback: list view will still show it.
+        router.push("/escrow");
       }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function readCreatedEscrowId(
+    logs: { topics: readonly `0x${string}`[]; data: `0x${string}` }[],
+  ): bigint | null {
+    for (const log of logs) {
+      try {
+        const decoded = decodeEventLog({
+          abi: abis.escrow,
+          topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+          data: log.data,
+        });
+        if (
+          decoded.eventName === "EscrowCreated" &&
+          decoded.args &&
+          "escrowId" in decoded.args
+        ) {
+          return (decoded.args as { escrowId: bigint }).escrowId;
+        }
+      } catch {
+        // Not an Escrow log — skip.
+      }
+    }
+    return null;
   }
 
   return (

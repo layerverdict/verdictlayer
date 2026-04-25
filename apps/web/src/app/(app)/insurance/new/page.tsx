@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { type Address, parseEther, keccak256, stringToBytes } from "viem";
+import { toast } from "sonner";
+import {
+  type Address,
+  decodeEventLog,
+  keccak256,
+  parseEther,
+  stringToBytes,
+} from "viem";
 import {
   useChainId,
   usePublicClient,
@@ -11,6 +18,7 @@ import {
 } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { ZERO_BYTES32 } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -82,13 +90,30 @@ function UnderwriteForm({ insuranceAddress }: { insuranceAddress: Address }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!publicClient) return;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(holder)) return;
-    if (!premium || !payout || !condition) return;
+
+    if (!publicClient) {
+      toast.error("Wallet not ready");
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(holder)) {
+      toast.error("Holder address is malformed");
+      return;
+    }
+    if (!condition.trim()) {
+      toast.error("Condition can't be empty");
+      return;
+    }
+    if (!premium || !payout) {
+      toast.error("Premium and payout are required");
+      return;
+    }
 
     const startTs = Math.floor(new Date(coverageStart).getTime() / 1000);
     const endTs = Math.floor(new Date(coverageEnd).getTime() / 1000);
-    if (endTs <= startTs) return;
+    if (Number.isNaN(startTs) || Number.isNaN(endTs) || endTs <= startTs) {
+      toast.error("Coverage end must be after coverage start");
+      return;
+    }
 
     let premiumWei: bigint;
     let payoutWei: bigint;
@@ -96,6 +121,11 @@ function UnderwriteForm({ insuranceAddress }: { insuranceAddress: Address }) {
       premiumWei = parseEther(premium);
       payoutWei = parseEther(payout);
     } catch {
+      toast.error("Premium or payout is not a valid number");
+      return;
+    }
+    if (payoutWei <= 0n) {
+      toast.error("Payout must be greater than zero");
       return;
     }
 
@@ -108,7 +138,7 @@ function UnderwriteForm({ insuranceAddress }: { insuranceAddress: Address }) {
     } else if (evidenceSpec.trim().length > 0) {
       spec = keccak256(stringToBytes(evidenceSpec.trim()));
     } else {
-      spec = ("0x" + "0".repeat(64)) as `0x${string}`;
+      spec = ZERO_BYTES32;
     }
 
     try {
@@ -138,15 +168,35 @@ function UnderwriteForm({ insuranceAddress }: { insuranceAddress: Address }) {
       );
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      if (receipt.status === "success") {
-        const total = (await publicClient.readContract({
-          address: insuranceAddress,
-          abi: abis.parametricInsurance,
-          functionName: "totalPolicies",
-        })) as bigint;
-        router.push(`/insurance/${total.toString()}`);
+      if (receipt.status !== "success") {
+        toast.error("Underwrite reverted on-chain");
+        return;
       }
+
+      // Parse PolicyCreated from the logs — avoids the race with
+      // concurrent underwriters on totalPolicies().
+      let newId: bigint | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: abis.parametricInsurance,
+            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+            data: log.data,
+          });
+          if (
+            decoded.eventName === "PolicyCreated" &&
+            decoded.args &&
+            "policyId" in decoded.args
+          ) {
+            newId = (decoded.args as { policyId: bigint }).policyId;
+            break;
+          }
+        } catch {
+          // Not a ParametricInsurance log — skip.
+        }
+      }
+
+      router.push(newId ? `/insurance/${newId.toString()}` : "/insurance");
     } finally {
       setSubmitting(false);
     }

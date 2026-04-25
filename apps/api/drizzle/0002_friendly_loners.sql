@@ -1,0 +1,1 @@
+ALTER TABLE "evidence" ALTER COLUMN "assertion_id" DROP NOT NULL;

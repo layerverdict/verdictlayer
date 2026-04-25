@@ -4,7 +4,8 @@ import { Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { type Address, erc20Abi, parseUnits } from "viem";
+import { toast } from "sonner";
+import { type Address, decodeEventLog, erc20Abi, parseUnits } from "viem";
 import {
   useAccount,
   useChainId,
@@ -108,19 +109,43 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!publicClient || !account) return;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(grantee)) return;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(token)) return;
-    if (milestones.length === 0) return;
-    if (milestones.some((m) => !m.amount || !m.criteria)) return;
+
+    if (!publicClient || !account) {
+      toast.error("Wallet not ready");
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(grantee)) {
+      toast.error("Grantee address is malformed");
+      return;
+    }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(token)) {
+      toast.error("Token address is malformed");
+      return;
+    }
+    if (milestones.length === 0) {
+      toast.error("Add at least one milestone");
+      return;
+    }
+    if (milestones.some((m) => !m.amount || !m.criteria.trim())) {
+      toast.error("Each milestone needs an amount and acceptance criteria");
+      return;
+    }
 
     const expiresTs = Math.floor(new Date(expires).getTime() / 1000);
-    if (expiresTs <= Math.floor(Date.now() / 1000)) return;
+    if (Number.isNaN(expiresTs) || expiresTs <= Math.floor(Date.now() / 1000)) {
+      toast.error("Expiry must be a future date");
+      return;
+    }
 
     let amounts: bigint[];
     try {
       amounts = milestones.map((m) => parseUnits(m.amount, tokenDecimals));
     } catch {
+      toast.error("A milestone amount is not a valid number");
+      return;
+    }
+    if (amounts.some((a) => a <= 0n)) {
+      toast.error("Milestone amounts must be greater than zero");
       return;
     }
     const criteria = milestones.map((m) => m.criteria);
@@ -129,6 +154,8 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
     try {
       setSubmitting(true);
 
+      // Wait for the approve receipt so the subsequent createGrant
+      // doesn't race an unconfirmed allowance.
       const allowance = await publicClient.readContract({
         address: token as Address,
         abi: erc20Abi,
@@ -147,6 +174,7 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
             chainId,
             pending: "Approving vault to pull funds…",
             success: "Approval confirmed",
+            waitFor: publicClient,
           },
         );
       }
@@ -172,16 +200,33 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
       );
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
-
-      const totalGrants = (await publicClient.readContract({
-        address: vaultAddress,
-        abi: abis.milestoneVault,
-        functionName: "totalGrants",
-      })) as bigint;
-
-      if (receipt.status === "success") {
-        router.push(`/milestones/${totalGrants.toString()}`);
+      if (receipt.status !== "success") {
+        toast.error("Create grant reverted on-chain");
+        return;
       }
+
+      let newId: bigint | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: abis.milestoneVault,
+            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+            data: log.data,
+          });
+          if (
+            decoded.eventName === "GrantCreated" &&
+            decoded.args &&
+            "grantId" in decoded.args
+          ) {
+            newId = (decoded.args as { grantId: bigint }).grantId;
+            break;
+          }
+        } catch {
+          // Not a MilestoneVault log — skip.
+        }
+      }
+
+      router.push(newId ? `/milestones/${newId.toString()}` : "/milestones");
     } finally {
       setSubmitting(false);
     }

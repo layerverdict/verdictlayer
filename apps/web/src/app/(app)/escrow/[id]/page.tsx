@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { type Address, zeroAddress } from "viem";
-import { useAccount, useChainId, useReadContract, useWriteContract } from "wagmi";
+import { type Address, decodeEventLog, zeroAddress } from "viem";
+import { useAccount, useChainId, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,14 @@ import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
-import { formatAmount, formatTimestamp, truncateAddress, truncateHash } from "@/lib/format";
+import { attachEvidence } from "@/lib/api";
+import {
+  formatAmount,
+  formatTimestamp,
+  isZeroHash,
+  truncateAddress,
+  truncateHash,
+} from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { abis } from "@/lib/web3/abis";
 import { maybeContractAddress } from "@/lib/web3/addresses";
@@ -45,8 +52,34 @@ import { runTx } from "@/lib/web3/tx";
 
 export default function EscrowDetailPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? "0";
+  const rawId = params?.id ?? "";
   const escrowAddress = maybeContractAddress("escrow");
+
+  let parsedId: bigint | null = null;
+  try {
+    if (/^\d+$/.test(rawId)) parsedId = BigInt(rawId);
+  } catch {
+    parsedId = null;
+  }
+
+  if (!parsedId || parsedId <= 0n) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Escrow"
+          title="Not found"
+          description="That escrow id isn't a positive integer."
+          action={
+            <Button variant="ghost" asChild>
+              <Link href="/escrow">Back to list</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const id = parsedId;
 
   return (
     <div className="space-y-8">
@@ -71,7 +104,7 @@ export default function EscrowDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <EscrowDetail id={BigInt(id)} escrowAddress={escrowAddress} />
+        <EscrowDetail id={id} escrowAddress={escrowAddress} />
       )}
     </div>
   );
@@ -117,10 +150,7 @@ function EscrowDetail({
         ? "freelancer"
         : "observer";
 
-  const activeAssertion =
-    record.assertionId && record.assertionId !== "0x" + "0".repeat(64)
-      ? record.assertionId
-      : null;
+  const activeAssertion = isZeroHash(record.assertionId) ? null : record.assertionId;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -226,8 +256,7 @@ function OverviewCard({
             value={formatTimestamp(Number(record.disputeResponseDeadline) * 1000)}
           />
         ) : null}
-        {record.assertionId &&
-        record.assertionId !== "0x" + "0".repeat(64) ? (
+        {!isZeroHash(record.assertionId) ? (
           <Field
             label="Assertion"
             value={truncateHash(record.assertionId, 8, 6)}
@@ -433,15 +462,10 @@ function DeliverDialog({
     }
   }
 
-  // Without an assertion yet we key the upload by a synthetic ID — the
-  // backend uses it only for FK resolution; for the delivery step the
-  // evidence root ends up directly in the contract state, not on an
-  // assertion. The API requires an existing assertionId though, so we
-  // use a pre-assertion placeholder: the Escrow local ID padded to
-  // 32 bytes. If you hit a 409 it means your API gateway rejects
-  // phantom assertionIds — this is fine for the demo; the real fix is
-  // a separate "raw upload" endpoint, which we'll add next.
-  const pseudoAssertion = (`0x${id.toString(16).padStart(64, "0")}`) as `0x${string}`;
+  // Delivery doesn't create an assertion on-chain — only the evidence
+  // root ends up in the Escrow struct. The evidence row is uploaded
+  // with a null assertion; it stays orphan on purpose (no verdict ever
+  // references this hash).
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -458,7 +482,6 @@ function DeliverDialog({
           </DialogDescription>
         </DialogHeader>
         <EvidenceUploader
-          assertionId={pseudoAssertion}
           uploader={freelancer}
           onUploaded={(res) => setRootHash(res.rootHash)}
           helper="Evidence is stored under a merkle root; the hash goes on-chain."
@@ -495,17 +518,16 @@ function DisputeDialog({
   client: Address;
 }) {
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
   const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const pseudoAssertion = (`0x${id.toString(16).padStart(64, "0")}`) as `0x${string}`;
-
   async function submit() {
-    if (!rootHash) return;
+    if (!rootHash || !publicClient) return;
     try {
       setSubmitting(true);
-      await runTx(
+      const hash = await runTx(
         writeContractAsync({
           address: escrowAddress,
           abi: abis.escrow,
@@ -519,6 +541,21 @@ function DisputeDialog({
           success: "Dispute opened",
         },
       );
+
+      // Pull the fresh assertionId from the receipt and attach the
+      // previously-uploaded evidence row to it. Best-effort: if the
+      // indexer is still catching up, attachEvidence retries with
+      // backoff and either succeeds or surfaces a toast on timeout.
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      const assertionId = readDisputeAssertionId(receipt.logs);
+      if (assertionId) {
+        try {
+          await attachEvidence({ rootHash, assertionId, uploader: client });
+        } catch (err) {
+          console.warn("attachEvidence failed", err);
+        }
+      }
+
       onDone();
       setOpen(false);
       setRootHash(null);
@@ -545,7 +582,6 @@ function DisputeDialog({
           </DialogDescription>
         </DialogHeader>
         <EvidenceUploader
-          assertionId={pseudoAssertion}
           uploader={client}
           onUploaded={(res) => setRootHash(res.rootHash)}
           helper="Screenshots, diffs, logs — anything the judge should weigh."
@@ -582,15 +618,16 @@ function RespondDialog({
   assertionId: `0x${string}`;
 }) {
   const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
   const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
-    if (!rootHash) return;
+    if (!rootHash || !publicClient) return;
     try {
       setSubmitting(true);
-      await runTx(
+      const hash = await runTx(
         writeContractAsync({
           address: escrowAddress,
           abi: abis.escrow,
@@ -603,6 +640,17 @@ function RespondDialog({
           success: "Response filed",
         },
       );
+
+      // The assertion already exists (dispute opened earlier); once
+      // the tx confirms we attach the rebuttal hash to it so the
+      // judgment worker sees both sides.
+      await publicClient.waitForTransactionReceipt({ hash });
+      try {
+        await attachEvidence({ rootHash, assertionId, uploader: freelancer });
+      } catch (err) {
+        console.warn("attachEvidence failed", err);
+      }
+
       onDone();
       setOpen(false);
       setRootHash(null);
@@ -625,7 +673,6 @@ function RespondDialog({
           </DialogDescription>
         </DialogHeader>
         <EvidenceUploader
-          assertionId={assertionId}
           uploader={freelancer}
           onUploaded={(res) => setRootHash(res.rootHash)}
         />
@@ -641,6 +688,37 @@ function RespondDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Decode a `DisputeOpened(uint256 escrowId, bytes32 assertionId, bytes32 clientEvidence)`
+ * event from a receipt's logs and return the assertionId.
+ *
+ * Uses viem's `decodeEventLog` against the Escrow ABI — safer than
+ * positionally indexing topics and resilient to ABI changes.
+ */
+function readDisputeAssertionId(
+  logs: { address: `0x${string}`; topics: readonly `0x${string}`[]; data: `0x${string}` }[],
+): `0x${string}` | null {
+  for (const log of logs) {
+    try {
+      const decoded = decodeEventLog({
+        abi: abis.escrow,
+        topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
+        data: log.data,
+      });
+      if (
+        decoded.eventName === "DisputeOpened" &&
+        decoded.args &&
+        "assertionId" in decoded.args
+      ) {
+        return (decoded.args as { assertionId: `0x${string}` }).assertionId;
+      }
+    } catch {
+      // Not an Escrow event — skip.
+    }
+  }
+  return null;
 }
 
 /* ─────────── Evidence Timeline ─────────── */
@@ -662,7 +740,7 @@ function EvidenceTimeline({ record }: { record: EscrowRecord }) {
       hash: record.freelancerEvidence,
       who: record.freelancer,
     },
-  ].filter((i) => i.hash && i.hash !== "0x" + "0".repeat(64));
+  ].filter((i) => !isZeroHash(i.hash));
 
   if (items.length === 0) {
     return (

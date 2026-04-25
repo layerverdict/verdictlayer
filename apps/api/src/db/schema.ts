@@ -43,9 +43,15 @@ export const evidence = pgTable(
   "evidence",
   {
     id: serial("id").primaryKey(),
-    assertionId: varchar("assertion_id", { length: 66 })
-      .notNull()
-      .references(() => assertions.id, { onDelete: "cascade" }),
+    // Nullable: evidence is uploaded BEFORE the on-chain tx in our
+    // apps (e.g. a client uploads dispute evidence, then openDispute
+    // creates the assertion). Rows land here with a null assertion
+    // and the indexer / API attach them once the AssertionCreated
+    // event fires.
+    assertionId: varchar("assertion_id", { length: 66 }).references(
+      () => assertions.id,
+      { onDelete: "cascade" },
+    ),
     rootHash: varchar("root_hash", { length: 66 }).notNull(),
     uploader: varchar("uploader", { length: 42 }).notNull(),
     mime: varchar("mime", { length: 64 }),

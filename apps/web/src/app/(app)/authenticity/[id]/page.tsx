@@ -20,6 +20,7 @@ import { ReasoningStream } from "@/components/verdict/reasoning-stream";
 import {
   formatRelative,
   formatTimestamp,
+  isZeroHash,
   truncateAddress,
   truncateHash,
 } from "@/lib/format";
@@ -37,8 +38,34 @@ import { explorerAddress } from "@/lib/web3/chains";
 
 export default function CheckDetailPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? "0";
+  const rawId = params?.id ?? "";
   const certifier = maybeContractAddress("authenticityCertifier");
+
+  let parsedId: bigint | null = null;
+  try {
+    if (/^\d+$/.test(rawId)) parsedId = BigInt(rawId);
+  } catch {
+    parsedId = null;
+  }
+
+  if (!parsedId || parsedId <= 0n) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow="Check"
+          title="Not found"
+          description="That check id isn't a positive integer."
+          action={
+            <Button variant="ghost" asChild>
+              <Link href="/authenticity">Back to list</Link>
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const id = parsedId;
 
   return (
     <div className="space-y-8">
@@ -66,7 +93,7 @@ export default function CheckDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <CheckDetail id={BigInt(id)} certifier={certifier} />
+        <CheckDetail id={id} certifier={certifier} />
       )}
     </div>
   );
@@ -98,10 +125,7 @@ function CheckDetail({
 
   const check = data as unknown as Check;
   const status = decodeCheckStatus(check.status);
-  const activeAssertion =
-    check.assertionId && check.assertionId !== "0x" + "0".repeat(64)
-      ? check.assertionId
-      : null;
+  const activeAssertion = isZeroHash(check.assertionId) ? null : check.assertionId;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -207,8 +231,7 @@ function OverviewCard({
             )} · ${formatRelative(Number(check.decidedAt) * 1000)}`}
           />
         ) : null}
-        {check.reasoningRoot &&
-        check.reasoningRoot !== "0x" + "0".repeat(64) ? (
+        {!isZeroHash(check.reasoningRoot) ? (
           <Field
             label="Reasoning"
             value={truncateHash(check.reasoningRoot, 10, 8)}
