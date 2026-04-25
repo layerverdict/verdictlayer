@@ -14,17 +14,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PRIVY_CONFIGURED } from "@/lib/auth";
 import { truncateAddress } from "@/lib/format";
-import { explorerAddress, supportedChains } from "@/lib/web3/chains";
+import { explorerAddress, supportedChains, zgMainnet, zgTestnet } from "@/lib/web3/chains";
 import { cn } from "@/lib/utils";
 
-const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
-
 /**
- * The single auth surface. When NEXT_PUBLIC_PRIVY_APP_ID isn't set,
- * the PrivyProvider isn't mounted — we can't call Privy hooks in that
- * case, so we short-circuit to a disabled stub. Splitting the branches
- * into separate components keeps React's Rules of Hooks intact.
+ * The single auth surface shown in every header. When Privy isn't wired
+ * up (no `NEXT_PUBLIC_PRIVY_APP_ID`) the button renders a disabled stub.
+ * Splitting into two subcomponents lets the hook-bearing variant stay
+ * out of the render tree during local scaffolding.
  */
 export function LoginButton({ compact = false }: { compact?: boolean }) {
   if (!PRIVY_CONFIGURED) {
@@ -58,7 +57,11 @@ function PrivyLoginButton({ compact }: { compact: boolean }) {
 
   if (!authenticated || !user) {
     return (
-      <Button variant="default" size={compact ? "sm" : "default"} onClick={login}>
+      <Button
+        variant="default"
+        size={compact ? "sm" : "default"}
+        onClick={() => login()}
+      >
         Sign in
       </Button>
     );
@@ -69,6 +72,7 @@ function PrivyLoginButton({ compact }: { compact: boolean }) {
     | `0x${string}`
     | undefined;
   const loginLabel = pickLoginLabel(user);
+  const explorerChainId = chainId || zgTestnet.id;
 
   async function copyAddress() {
     if (!address) return;
@@ -83,7 +87,7 @@ function PrivyLoginButton({ compact }: { compact: boolean }) {
           <span
             className={cn(
               "inline-block h-2 w-2 rounded-full",
-              chainId === 16661 ? "bg-green-400" : "bg-sky-400",
+              chainId === zgMainnet.id ? "bg-green-400" : "bg-sky-400",
             )}
           />
           <span className="font-mono text-xs">
@@ -114,7 +118,7 @@ function PrivyLoginButton({ compact }: { compact: boolean }) {
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
               <a
-                href={explorerAddress(chainId || supportedChains[0].id, address)}
+                href={explorerAddress(explorerChainId, address)}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2"
@@ -149,7 +153,12 @@ function PrivyLoginButton({ compact }: { compact: boolean }) {
           );
         })}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={logout} className="text-red-300 focus:text-red-200">
+        <DropdownMenuItem
+          onSelect={() => {
+            void logout();
+          }}
+          className="text-red-300 focus:text-red-200"
+        >
           <LogOut className="h-3.5 w-3.5" />
           Sign out
         </DropdownMenuItem>

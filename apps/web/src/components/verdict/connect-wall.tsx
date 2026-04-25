@@ -1,13 +1,16 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
 import type { ReactNode } from "react";
-import { useAccount } from "wagmi";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PRIVY_CONFIGURED, useAuth } from "@/lib/auth";
 
 /**
  * Page-level auth gate for routes that can't do anything without a
@@ -17,31 +20,21 @@ const PRIVY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_PRIVY_APP_ID);
  * `AuthAction`).
  */
 export function ConnectWall({ children }: { children: ReactNode }) {
-  if (!PRIVY_CONFIGURED) {
-    return <WagmiOnlyGate>{children}</WagmiOnlyGate>;
-  }
-  return <PrivyGate>{children}</PrivyGate>;
-}
-
-function WagmiOnlyGate({ children }: { children: ReactNode }) {
-  const { isConnected } = useAccount();
-  if (isConnected) return <>{children}</>;
-  return (
-    <GateCard
-      title="Wallet required"
-      description="Connect an EVM wallet to use this flow. Once sign-in is configured (NEXT_PUBLIC_PRIVY_APP_ID), email / social options become available."
-    />
-  );
-}
-
-function PrivyGate({ children }: { children: ReactNode }) {
-  const { ready, authenticated, login } = usePrivy();
-  const { isConnected } = useAccount();
+  const { ready, signedIn, login } = useAuth();
 
   if (!ready) {
     return <GateCard title="Loading…" description="Reading your session." />;
   }
-  if (authenticated || isConnected) return <>{children}</>;
+  if (signedIn) return <>{children}</>;
+
+  if (!PRIVY_CONFIGURED) {
+    return (
+      <GateCard
+        title="Wallet required"
+        description="Connect an EVM wallet to use this flow. Configure Privy (NEXT_PUBLIC_PRIVY_APP_ID) to enable email / social sign-in."
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
@@ -54,7 +47,7 @@ function PrivyGate({ children }: { children: ReactNode }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center">
-          <Button onClick={login}>Sign in</Button>
+          <Button onClick={() => login()}>Sign in</Button>
         </CardContent>
       </Card>
     </div>

@@ -27,7 +27,9 @@ export function ClientProviders({ children }: { children: ReactNode }) {
           queries: {
             staleTime: 15_000,
             refetchOnWindowFocus: false,
-            retry: 1,
+            // 0G testnet RPC flakes intermittently; two retries is enough
+            // to mask a single 502 without delaying the UI past 5s.
+            retry: 2,
           },
         },
       }),
