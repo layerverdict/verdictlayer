@@ -15,6 +15,18 @@ export enum AssertionOutcome {
   ESCALATED = 4,
 }
 
+/**
+ * String representation of `AssertionOutcome` — matches the `outcome`
+ * varchar in Postgres + the SSE payload label. Prefer this over the
+ * enum when the value will be serialised.
+ */
+export type AssertionOutcomeLabel =
+  | "PENDING"
+  | "TRUE"
+  | "FALSE"
+  | "INVALID"
+  | "ESCALATED";
+
 export type Hex = `0x${string}`;
 export type Address = `0x${string}`;
 export type Bytes32 = `0x${string}`;

@@ -1,5 +1,7 @@
 "use client";
 
+import type { AssertionOutcomeLabel } from "@verdict/shared/types";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
@@ -17,7 +19,7 @@ export type AssertionRow = {
   callback: string;
   callbackSelector: string;
   challengePeriod: number;
-  outcome: "PENDING" | "TRUE" | "FALSE" | "INVALID" | "ESCALATED";
+  outcome: AssertionOutcomeLabel;
   reasoningRoot: string | null;
   verdictTx: string | null;
   createdAt: string;

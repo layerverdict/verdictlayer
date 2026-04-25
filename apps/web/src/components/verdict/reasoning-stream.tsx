@@ -1,5 +1,6 @@
 "use client";
 
+import type { AssertionOutcomeLabel } from "@verdict/shared/types";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -16,7 +17,7 @@ type StreamEvent =
       kind: "outcome";
       data: {
         assertionId: string;
-        outcome: "TRUE" | "FALSE" | "INVALID" | "ESCALATED";
+        outcome: Exclude<AssertionOutcomeLabel, "PENDING">;
         confidence?: number;
         reasoningRoot?: string;
         verdictTx?: string;
@@ -88,8 +89,7 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
             {outcome ? (
               <OutcomeBadge
                 outcome={
-                  (outcome as { outcome?: "TRUE" | "FALSE" | "INVALID" | "ESCALATED" })
-                    .outcome ?? "PENDING"
+                  (outcome as { outcome?: AssertionOutcomeLabel }).outcome ?? "PENDING"
                 }
               />
             ) : (

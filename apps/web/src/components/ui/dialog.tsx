@@ -42,7 +42,7 @@ export const DialogContent = forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl",
+        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg max-h-[90vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 gap-4 rounded-2xl border border-white/10 bg-[#0a0a0a] p-6 shadow-[0_20px_80px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl",
         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
         "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
         className,

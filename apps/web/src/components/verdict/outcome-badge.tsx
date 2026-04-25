@@ -1,8 +1,8 @@
+import type { AssertionOutcomeLabel } from "@verdict/shared/types";
+
 import { Badge } from "@/components/ui/badge";
 
-type Outcome = "PENDING" | "TRUE" | "FALSE" | "INVALID" | "ESCALATED";
-
-export function OutcomeBadge({ outcome }: { outcome: Outcome }) {
+export function OutcomeBadge({ outcome }: { outcome: AssertionOutcomeLabel }) {
   switch (outcome) {
     case "TRUE":
       return <Badge variant="success">Asserter won</Badge>;

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, type Variants } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -53,10 +53,12 @@ export function Typewriter({
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentTextIndex, setCurrentTextIndex] = useState(0);
 
-  const texts = Array.isArray(text) ? text : [text];
+  // Stabilise the texts array so effect deps don't churn when a single
+  // string literal is passed in (new array identity every render).
+  const texts = useMemo(() => (Array.isArray(text) ? text : [text]), [text]);
 
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: NodeJS.Timeout | undefined;
     const currentText = texts[currentTextIndex] ?? "";
 
     const startTyping = () => {
@@ -66,7 +68,6 @@ export function Typewriter({
           if (currentTextIndex === texts.length - 1 && !loop) return;
           setCurrentTextIndex((prev) => (prev + 1) % texts.length);
           setCurrentIndex(0);
-          timeout = setTimeout(() => {}, waitTime);
         } else {
           timeout = setTimeout(() => {
             setDisplayText((prev) => prev.slice(0, -1));
@@ -92,7 +93,9 @@ export function Typewriter({
       startTyping();
     }
 
-    return () => clearTimeout(timeout);
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
   }, [
     currentIndex,
     displayText,
