@@ -49,6 +49,10 @@ export interface RunInferenceInput {
   messages: ChatMessage[];
   assertionId?: `0x${string}`; // for SSE streaming — optional for ad-hoc calls
   temperature?: number;
+  /** Upper bound on the whole request, start-of-stream to finish.
+   *  Default 90s — long enough for GLM-5 on a busy provider, short
+   *  enough to stay inside the BullMQ lockDuration (120s). */
+  timeoutMs?: number;
 }
 
 /**
@@ -70,16 +74,33 @@ export async function runInference(input: RunInferenceInput): Promise<InferenceR
   const { endpoint, model, headers } = await getInferenceContext(service.providerAddress);
   const started = Date.now();
 
-  const response = await fetch(`${endpoint}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify({
-      messages,
-      model,
-      stream: true,
-      temperature: input.temperature ?? 0.2,
-    }),
-  });
+  // AbortController backstop for unresponsive providers — without this,
+  // a frozen stream keeps the job locked until BullMQ drops the lock
+  // (120s) and still leaves a live reader on the old request.
+  const controller = new AbortController();
+  const timeoutMs = input.timeoutMs ?? 90_000;
+  const abortTimer = setTimeout(
+    () => controller.abort(new Error("inference timed out")),
+    timeoutMs,
+  );
+
+  let response: Response;
+  try {
+    response = await fetch(`${endpoint}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify({
+        messages,
+        model,
+        stream: true,
+        temperature: input.temperature ?? 0.2,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    clearTimeout(abortTimer);
+    throw err;
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
@@ -152,6 +173,8 @@ export async function runInference(input: RunInferenceInput): Promise<InferenceR
     // skipping processResponse leaves the provider's account in an
     // inconsistent state.
     streamError = err;
+  } finally {
+    clearTimeout(abortTimer);
   }
 
   const finalChatId = headerChatId ?? streamChatId;

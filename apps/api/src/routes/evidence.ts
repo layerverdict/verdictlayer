@@ -146,27 +146,39 @@ export const evidenceRoutes: FastifyPluginAsync = async (app) => {
     uploader: AddressSchema,
   });
 
-  app.post("/api/evidence/attach", async (req, reply) => {
-    const parsed = AttachBody.safeParse(req.body);
-    if (!parsed.success) {
-      return reply.code(400).send({ error: "invalid body", issues: parsed.error.issues });
-    }
-    const { rootHash, assertionId, uploader } = parsed.data;
+  app.post(
+    "/api/evidence/attach",
+    {
+      // Evidence attach doesn't take a file, so the global 300/min is
+      // too generous — a single user should never need > 30 attaches
+      // per minute (two per dispute tx, at most a few disputes).
+      config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+    },
+    async (req, reply) => {
+      const parsed = AttachBody.safeParse(req.body);
+      if (!parsed.success) {
+        return reply.code(400).send({ error: "invalid body", issues: parsed.error.issues });
+      }
+      const { rootHash, assertionId, uploader } = parsed.data;
 
-    const assertion = await getAssertion(assertionId as `0x${string}`);
-    if (!assertion) {
-      return reply.code(409).send({
-        error: "assertion not yet mirrored — wait for the indexer to catch up",
-      });
-    }
+      const assertion = await getAssertion(assertionId as `0x${string}`);
+      if (!assertion) {
+        return reply.code(409).send({
+          error: "assertion not yet mirrored — wait for the indexer to catch up",
+        });
+      }
 
-    const updated = await attachEvidence(
-      rootHash as `0x${string}`,
-      assertionId as `0x${string}`,
-      uploader as `0x${string}`,
-    );
-    return reply.code(200).send({ attached: updated });
-  });
+      // Defence in depth: only the uploader of the raw evidence row
+      // can attach it. Any mismatch yields zero rows updated, which
+      // tells a would-be squatter nothing about the target assertion.
+      const updated = await attachEvidence(
+        rootHash as `0x${string}`,
+        assertionId as `0x${string}`,
+        uploader as `0x${string}`,
+      );
+      return reply.code(200).send({ attached: updated });
+    },
+  );
 
   app.get<{ Params: { assertionId: string } }>(
     "/api/evidence/:assertionId",

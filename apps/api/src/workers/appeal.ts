@@ -8,6 +8,7 @@
 
 import { Worker, type Job } from "bullmq";
 
+import { eventBus } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
 import { createRedis } from "../lib/redis.js";
 import { QUEUE_NAMES, type AppealJob } from "../lib/queue.js";
@@ -65,6 +66,14 @@ export function startAppealWorker(concurrency = 1): Worker<AppealJobPayload> {
 
   worker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, assertionId: job?.data.assertionId, err }, "appeal job failed");
+
+    const attempts = job?.opts.attempts ?? 1;
+    if (job && job.attemptsMade >= attempts) {
+      eventBus.publish(job.data.assertionId, {
+        kind: "done",
+        payload: { ts: Date.now(), failed: true },
+      });
+    }
   });
 
   return worker;

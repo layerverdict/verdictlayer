@@ -9,6 +9,7 @@
 
 import { Worker, type Job } from "bullmq";
 
+import { eventBus } from "../lib/events.js";
 import { logger } from "../lib/logger.js";
 import { createRedis } from "../lib/redis.js";
 import { QUEUE_NAMES, type JudgmentJob } from "../lib/queue.js";
@@ -40,9 +41,28 @@ export function startJudgmentWorker(concurrency = 2): Worker<JudgmentJob> {
 
   worker.on("failed", (job, err) => {
     logger.error(
-      { jobId: job?.id, assertionId: job?.data.assertionId, err },
+      {
+        jobId: job?.id,
+        assertionId: job?.data.assertionId,
+        attemptsMade: job?.attemptsMade,
+        attemptsAllowed: job?.opts.attempts,
+        err,
+      },
       "judgment job failed",
     );
+
+    // Publish `done` on the final attempt so live SSE subscribers
+    // (ReasoningStream) stop showing a "still working" spinner after
+    // BullMQ has given up. Without this, the stream keeps the last
+    // `error` event on screen but the EventSource auto-reconnects,
+    // making the failure look transient.
+    const attempts = job?.opts.attempts ?? 1;
+    if (job && job.attemptsMade >= attempts) {
+      eventBus.publish(job.data.assertionId, {
+        kind: "done",
+        payload: { ts: Date.now(), failed: true },
+      });
+    }
   });
 
   return worker;

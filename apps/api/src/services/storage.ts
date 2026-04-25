@@ -9,10 +9,10 @@
  *            skills/storage/download-file/SKILL.md
  */
 
-import { createWriteStream, existsSync, mkdirSync, promises as fsp } from "node:fs";
+import { createWriteStream, promises as fsp } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { Indexer, ZgFile } from "@0glabs/0g-ts-sdk";
@@ -112,7 +112,13 @@ export async function uploadPath(path: string): Promise<UploadResult> {
       size: stats.size,
     };
   } finally {
-    await file.close();
+    try {
+      await file.close();
+    } catch (err) {
+      // Swallow close errors so the original upload outcome isn't masked
+      // by a teardown failure; still log so stalls are visible.
+      logger.warn({ err, path }, "ZgFile close failed");
+    }
   }
 }
 
@@ -122,9 +128,8 @@ export async function uploadPath(path: string): Promise<UploadResult> {
 export async function downloadBuffer(rootHash: string): Promise<StoredBlob> {
   validateRootHash(rootHash);
 
+  // os.tmpdir() always exists; no need to mkdir / existsSync.
   const tempPath = join(tmpdir(), `verdict-dl-${Date.now()}-${randomUUID()}.bin`);
-  const dir = dirname(tempPath);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
   try {
     // indexer.download can both THROW and return an error — guard both.

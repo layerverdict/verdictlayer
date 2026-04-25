@@ -27,10 +27,23 @@ import {
 import { getSigner } from "../lib/chain.js";
 
 const MIN_LEDGER_0G = 1.0;
-const MIN_LEDGER_WEI = ethers.parseEther("1.0");
+// Derived so the bigint and the float stay in lockstep — changing one
+// place is enough.
+const MIN_LEDGER_WEI = ethers.parseEther(MIN_LEDGER_0G.toString());
+
+// Provider rotations are rare but not impossible — cap the service list
+// cache at 10 minutes so a long-running process eventually notices new
+// providers without a manual invalidate.
+const SERVICES_TTL_MS = 10 * 60_000;
 
 let brokerPromise: Promise<ZGComputeBroker> | undefined;
 let servicesPromise: Promise<ServiceTuple[]> | undefined;
+let servicesFetchedAt = 0;
+// `ensureLedger` must run at most once concurrently — otherwise
+// parallel `runInference` calls each see the ledger below the minimum
+// and each issue their own depositFund, over-withdrawing from the
+// wallet.
+let ledgerPromise: Promise<LedgerTuple> | undefined;
 const acknowledged = new Set<string>();
 
 export async function getBroker(): Promise<ZGComputeBroker> {
@@ -63,15 +76,21 @@ export interface DiscoveredService {
 }
 
 export async function listServices(): Promise<ServiceTuple[]> {
-  if (!servicesPromise) {
+  const now = Date.now();
+  const isStale = now - servicesFetchedAt > SERVICES_TTL_MS;
+  if (!servicesPromise || isStale) {
     const p = (async () => {
       const broker = await getBroker();
       const services = (await broker.inference.listService()) as unknown as ServiceTuple[];
       logger.info({ count: services.length }, "discovered compute services");
+      servicesFetchedAt = Date.now();
       return services;
     })();
     p.catch(() => {
-      if (servicesPromise === p) servicesPromise = undefined;
+      if (servicesPromise === p) {
+        servicesPromise = undefined;
+        servicesFetchedAt = 0;
+      }
     });
     servicesPromise = p;
   }
@@ -81,12 +100,15 @@ export async function listServices(): Promise<ServiceTuple[]> {
 /** Refresh the service list — call when providers rotate. */
 export function invalidateServiceCache() {
   servicesPromise = undefined;
+  servicesFetchedAt = 0;
 }
 
 /**
  * Pick the TEE chatbot provider whose model name matches `modelHint`
  * (substring, case-insensitive). Falls back to the first TEE-verified
- * chatbot if no match.
+ * chatbot if no match, and logs a warning so silent mismatches are
+ * traceable — an unintended fallback that ships GLM-5 reasoning via a
+ * Qwen provider should be loud.
  */
 export async function pickTeeChatbot(modelHint: string): Promise<DiscoveredService> {
   const services = await listServices();
@@ -95,9 +117,20 @@ export async function pickTeeChatbot(modelHint: string): Promise<DiscoveredServi
     throw new Error("no TEE-verified chatbot services on this network");
   }
   const hint = modelHint.toLowerCase();
-  const preferred =
-    chatbots.find((s) => s[6].toLowerCase().includes(hint)) ?? chatbots[0];
+  const match = chatbots.find((s) => s[6].toLowerCase().includes(hint));
+  const preferred = match ?? chatbots[0];
   if (!preferred) throw new Error("no TEE chatbot matched hint");
+
+  if (!match) {
+    logger.warn(
+      {
+        requestedHint: modelHint,
+        availableModels: chatbots.map((s) => s[6]),
+        fellBackTo: preferred[6],
+      },
+      "pickTeeChatbot fell back — no provider matched the model hint",
+    );
+  }
 
   return {
     providerAddress: preferred[0],
@@ -140,16 +173,34 @@ export async function pickTeeChatbotSwarm(count: number): Promise<DiscoveredServ
 }
 
 /**
- * Ensure the ledger has at least `MIN_LEDGER_0G` available.
- * Creates the ledger on the fly if missing, tops up otherwise.
+ * Ensure the ledger has at least `MIN_LEDGER_0G` available. Creates the
+ * ledger on the fly if missing, tops up otherwise.
+ *
+ * Serialised via `ledgerPromise` so parallel `runInference` calls all
+ * await the same top-up — otherwise each one observes the same deficit
+ * and each issues its own `depositFund`, multiplying the withdrawal
+ * from the wallet.
  */
 export async function ensureLedger(): Promise<LedgerTuple> {
+  if (!ledgerPromise) {
+    const p = runEnsureLedger();
+    p.catch(() => {
+      // Don't trap callers behind a rejected cache — the next caller
+      // retries from scratch.
+      if (ledgerPromise === p) ledgerPromise = undefined;
+    });
+    ledgerPromise = p;
+  }
+  return ledgerPromise;
+}
+
+async function runEnsureLedger(): Promise<LedgerTuple> {
   const broker = await getBroker();
   let ledger: LedgerTuple;
   try {
     ledger = (await broker.ledger.getLedger()) as unknown as LedgerTuple;
   } catch {
-    logger.info("ledger missing — creating with 1.0 0G");
+    logger.info({ min: MIN_LEDGER_0G }, "ledger missing — creating with minimum balance");
     await broker.ledger.addLedger(MIN_LEDGER_0G);
     ledger = (await broker.ledger.getLedger()) as unknown as LedgerTuple;
   }
@@ -162,6 +213,12 @@ export async function ensureLedger(): Promise<LedgerTuple> {
     await broker.ledger.depositFund(shortfallEth);
     ledger = (await broker.ledger.getLedger()) as unknown as LedgerTuple;
   }
+
+  // Success — release the gate so a subsequent inference after some
+  // time can refresh the balance. (Don't cache forever; subsequent
+  // inferences want fresh available-balance reads before committing to
+  // a new request.)
+  ledgerPromise = undefined;
   return ledger;
 }
 
@@ -215,5 +272,7 @@ export async function processResponse(
 export function __resetComputeClients() {
   brokerPromise = undefined;
   servicesPromise = undefined;
+  servicesFetchedAt = 0;
+  ledgerPromise = undefined;
   acknowledged.clear();
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "assertions" ADD COLUMN "verdicted_at" timestamp with time zone;

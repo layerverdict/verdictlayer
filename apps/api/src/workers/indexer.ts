@@ -16,7 +16,7 @@
  *     reliably and polling is trivial to reason about.
  */
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { ethers } from "ethers";
 
 import { config } from "../config.js";
@@ -60,6 +60,62 @@ export async function runIndexerOnce() {
     indexContract(contracts.assertionRegistry, "assertionRegistry", safeTip, handleRegistryEvent),
     indexContract(contracts.escalationManager, "escalationManager", safeTip, handleEscalationEvent),
   ]);
+
+  // AUDITED verdicts need someone to flip them to RESOLVED once the
+  // challenge window closes (Verdict's contract exposes resolveAssertion
+  // for this — it's permissionless after the window). If we skipped
+  // this step the application callback never fires and the escrow funds
+  // stay locked forever.
+  await finaliseDueAudited();
+}
+
+async function finaliseDueAudited() {
+  const now = new Date();
+  // Rough filter: AUDITED verdicts whose verdictedAt + challengePeriod
+  // is in the past. The contract does the authoritative check on call;
+  // we just prune obvious candidates here.
+  const candidates = await db
+    .select()
+    .from(schema.assertions)
+    .where(
+      and(
+        eq(schema.assertions.mode, "AUDITED"),
+        isNotNull(schema.assertions.verdictedAt),
+        lte(schema.assertions.verdictedAt, now),
+      ),
+    );
+
+  const ready = candidates.filter((row) => {
+    if (!row.verdictedAt) return false;
+    if (row.outcome === "PENDING" || row.resolvedAt) return false;
+    if (row.outcome === "ESCALATED") return false; // owned by the panel flow
+    const dueAt = row.verdictedAt.getTime() + row.challengePeriod * 1000;
+    return now.getTime() >= dueAt;
+  });
+
+  if (ready.length === 0) return;
+
+  const { assertionRegistry } = await getContracts();
+  const resolve = assertionRegistry.getFunction("resolveAssertion");
+  for (const row of ready) {
+    try {
+      // finalOutcome is ignored on the permissionless path; pass 0.
+      const tx = await resolve(row.id, 0);
+      await tx.wait();
+      logger.info(
+        { assertionId: row.id, outcome: row.outcome },
+        "auto-finalised AUDITED assertion after challenge window",
+      );
+    } catch (err) {
+      logger.warn(
+        { err, assertionId: row.id },
+        "auto-finalise failed — likely challenged or already resolved",
+      );
+      // AssertionResolved event will flip the row, or the next tick
+      // finds the row still RESOLVED==false and retries. No state to
+      // clean up here.
+    }
+  }
 }
 
 async function indexContract(
@@ -120,37 +176,60 @@ async function handleRegistryEvent(e: ethers.EventLog | ethers.Log) {
         })
         .onConflictDoNothing();
 
-      for (const root of evidenceRoots as string[]) {
-        await db
-          .insert(schema.evidence)
-          .values({
-            assertionId: id as string,
-            rootHash: root,
-            uploader: asserter as string,
-            size: 0,
-            metadata: { source: "AssertionCreated" },
-          })
-          .onConflictDoNothing();
-      }
+      // Evidence attachment is now driven by the `/api/evidence/attach`
+      // endpoint — clients upload BEFORE the tx and attach AFTER they
+      // see the receipt. We deliberately DON'T synthesise evidence rows
+      // from the on-chain roots here: the asserter is almost always the
+      // application contract (Escrow.sol, ParametricInsurance.sol…),
+      // not the end user, so assigning `uploader = asserter` would
+      // corrupt provenance. Any evidence root the indexer sees that
+      // the web client didn't upload is orphan-on-purpose: reasoning
+      // logs still cite the root, but the DB only stores rows we have
+      // high-quality metadata for.
 
       await getJudgmentQueue().add(
         "judge",
         { assertionId: id as `0x${string}` },
         { jobId: `judge:${id}` },
       );
-      logger.info({ assertionId: id }, "indexed AssertionCreated");
+      logger.info(
+        { assertionId: id, evidenceRootCount: (evidenceRoots as string[]).length },
+        "indexed AssertionCreated",
+      );
       break;
     }
 
     case "VerdictSubmitted": {
       const [id, , , outcome, reasoningRoot] = evt.args;
       const name = outcomeName(Number(outcome));
+
+      // Pull challengePeriod from chain so the scheduler knows when
+      // the AUDITED window closes. Cheap — a single view call per
+      // verdict. Also capture the block timestamp as verdictedAt.
+      let challengePeriod = 0;
+      let verdictedAt: Date | undefined;
+      try {
+        const { assertionRegistry } = await getContracts();
+        const onchain = (await assertionRegistry.getFunction("getAssertion")(id)) as {
+          challengePeriod: bigint;
+          verdictedAt: bigint;
+        };
+        challengePeriod = Number(onchain.challengePeriod);
+        if (onchain.verdictedAt > 0n) {
+          verdictedAt = new Date(Number(onchain.verdictedAt) * 1000);
+        }
+      } catch (err) {
+        logger.warn({ err, assertionId: id }, "failed to read verdict metadata from chain");
+      }
+
       const updated = await db
         .update(schema.assertions)
         .set({
           outcome: name,
           reasoningRoot: reasoningRoot as string,
           verdictTx: evt.transactionHash,
+          challengePeriod,
+          verdictedAt,
         })
         .where(eq(schema.assertions.id, id as string))
         .returning({ id: schema.assertions.id });

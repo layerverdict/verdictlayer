@@ -31,27 +31,45 @@ export const verdictRoutes: FastifyPluginAsync = async (app) => {
     reply.raw.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
     reply.raw.flushHeaders?.();
 
+    // `closed` guards against writes landing after we've ended the
+    // response — happens when the worker emits `done` concurrently
+    // with the replay-from-db path below, or the client disconnects
+    // mid-frame. `reply.raw.write()` throws "write after end" otherwise.
+    let closed = false;
+    let heartbeat: NodeJS.Timeout | undefined;
+
     const write = (frame: string) => {
+      if (closed) return;
       reply.raw.write(frame);
     };
 
-    write(`retry: 3000\n\n`);
-
-    let heartbeat: NodeJS.Timeout | undefined;
     const cleanup = () => {
+      if (closed) return;
+      closed = true;
       if (heartbeat) clearInterval(heartbeat);
       heartbeat = undefined;
       unsubscribe();
     };
 
+    const endStream = () => {
+      cleanup();
+      try {
+        reply.raw.end();
+      } catch {
+        // socket already gone — fine.
+      }
+    };
+
+    write(`retry: 3000\n\n`);
+
     const unsubscribe = eventBus.subscribe(id, (event: VerdictEvent) => {
+      if (closed) return;
       write(
         `event: ${event.kind}\n` +
           `data: ${JSON.stringify({ payload: event.payload, ts: event.ts })}\n\n`,
       );
       if (event.kind === "done" || event.kind === "error") {
-        cleanup();
-        reply.raw.end();
+        endStream();
       }
     });
 
@@ -63,8 +81,11 @@ export const verdictRoutes: FastifyPluginAsync = async (app) => {
 
     // If the assertion is already resolved, replay the final state and
     // close the stream — no inference job will ever publish to this id.
+    // Do this AFTER registering the live subscription so a concurrent
+    // worker write can't race us — if worker already ended the stream,
+    // `closed` short-circuits the replay writes.
     const assertion = await getAssertion(id as `0x${string}`);
-    if (assertion && assertion.outcome !== "PENDING") {
+    if (!closed && assertion && assertion.outcome !== "PENDING") {
       write(
         `event: outcome\n` +
           `data: ${JSON.stringify({
@@ -80,8 +101,7 @@ export const verdictRoutes: FastifyPluginAsync = async (app) => {
           })}\n\n`,
       );
       write(`event: done\ndata: ${JSON.stringify({ ts: Date.now(), replay: true })}\n\n`);
-      cleanup();
-      reply.raw.end();
+      endStream();
     }
 
     // Prevent fastify from auto-ending the response.

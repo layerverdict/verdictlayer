@@ -167,7 +167,15 @@ async function runPanelist(
   judgeTokenId: bigint,
   assertionId: `0x${string}`,
 ): Promise<PanelVerdict> {
-  const inference = await runInference({ service, messages, assertionId });
+  // Appeal is worth a wider exploration than the first-instance judge —
+  // identical temperatures risk three models reaching the same answer
+  // for the same reason, which defeats the swarm's purpose.
+  const inference = await runInference({
+    service,
+    messages,
+    assertionId,
+    temperature: 0.4,
+  });
   const decision = parseJudgeDecision(inference.answer);
 
   const transcript = JSON.stringify(

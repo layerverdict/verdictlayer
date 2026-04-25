@@ -29,6 +29,10 @@ export const assertions = pgTable(
     outcome: varchar("outcome", { length: 16 }).notNull().default("PENDING"),
     reasoningRoot: varchar("reasoning_root", { length: 66 }),
     verdictTx: varchar("verdict_tx", { length: 66 }),
+    // Set when the judge writes a verdict on-chain; AUDITED assertions
+    // need this + challengePeriod to know when the challenge window
+    // closes and the scheduler can call resolveAssertion.
+    verdictedAt: timestamp("verdicted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   },
