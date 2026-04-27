@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { type Address, decodeEventLog } from "viem";
 import {
   useAccount,
@@ -31,11 +31,13 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
+import { FlightOracle } from "@/components/verdict/flight-oracle";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
 import { ReasoningStream } from "@/components/verdict/reasoning-stream";
-import { attachEvidence } from "@/lib/api";
+import { attachEvidence, getFeatures, type ApiFeatures } from "@/lib/api";
 import {
   formatAmount,
   formatTimestamp,
@@ -460,6 +462,25 @@ function ClaimDialog({
   const [open, setOpen] = useState(false);
   const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [features, setFeatures] = useState<ApiFeatures | null>(null);
+
+  // Feature flags are cheap to fetch (static JSON) and we only hit the
+  // endpoint when the dialog mounts, so no SWR machinery needed.
+  useEffect(() => {
+    let alive = true;
+    getFeatures()
+      .then((f) => {
+        if (alive) setFeatures(f);
+      })
+      .catch(() => {
+        // Feature endpoint down — default to "oracle disabled", which
+        // leaves the file-upload tab as the only surface.
+        if (alive) setFeatures({ oracles: { flight: false } });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   async function submit() {
     if (!rootHash || !publicClient) return;
@@ -534,10 +555,31 @@ function ClaimDialog({
             <span className="font-mono text-white/80">{formatAmount(bond)} 0G</span>.
           </DialogDescription>
         </DialogHeader>
-        <EvidenceUploader
-          uploader={holder}
-          onUploaded={(res) => setRootHash(res.rootHash)}
-        />
+        {features?.oracles.flight ? (
+          <Tabs defaultValue="upload" className="space-y-3">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upload">Upload file</TabsTrigger>
+              <TabsTrigger value="flight">Flight oracle</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload">
+              <EvidenceUploader
+                uploader={holder}
+                onUploaded={(res) => setRootHash(res.rootHash)}
+              />
+            </TabsContent>
+            <TabsContent value="flight">
+              <FlightOracle
+                uploader={holder}
+                onSnapshot={(res) => setRootHash(res.rootHash)}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <EvidenceUploader
+            uploader={holder}
+            onUploaded={(res) => setRootHash(res.rootHash)}
+          />
+        )}
         <DialogFooter>
           <Button
             disabled={!rootHash || submitting}

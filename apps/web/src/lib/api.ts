@@ -104,3 +104,56 @@ export async function attachEvidence(input: {
   }
   throw new Error("attachEvidence exhausted retries");
 }
+
+export interface ApiFeatures {
+  oracles: {
+    flight: boolean;
+  };
+}
+
+export async function getFeatures(): Promise<ApiFeatures> {
+  return api<ApiFeatures>("/features");
+}
+
+export interface FlightSnapshot {
+  source: "aviationstack";
+  fetchedAt: string;
+  query: { flightIata: string; flightDate: string };
+  flight: { iata: string; icao: string | null; number: string | null };
+  airline: { name: string | null; iata: string | null };
+  departure: {
+    airport: string | null;
+    iata: string | null;
+    scheduled: string | null;
+    estimated: string | null;
+    actual: string | null;
+    delayMinutes: number | null;
+  };
+  arrival: {
+    airport: string | null;
+    iata: string | null;
+    scheduled: string | null;
+    estimated: string | null;
+    actual: string | null;
+    delayMinutes: number | null;
+  };
+  status: string | null;
+}
+
+export interface FlightSnapshotResponse {
+  rootHash: `0x${string}`;
+  txHash: string;
+  snapshot: FlightSnapshot;
+}
+
+export async function fetchFlightSnapshot(input: {
+  flightIata: string;
+  flightDate: string;
+  uploader: `0x${string}`;
+  assertionId?: `0x${string}`;
+}): Promise<FlightSnapshotResponse> {
+  return api<FlightSnapshotResponse>("/api/oracle/flight", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}

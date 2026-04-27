@@ -10,6 +10,7 @@ import { healthRoutes } from "./routes/health.js";
 import { evidenceRoutes } from "./routes/evidence.js";
 import { assertionRoutes } from "./routes/assertions.js";
 import { verdictRoutes } from "./routes/verdict.js";
+import { oracleRoutes } from "./routes/oracle.js";
 import { closeQueues } from "./lib/queue.js";
 import { closeRedis } from "./lib/redis.js";
 import { startJudgmentWorker } from "./workers/judgment.js";
@@ -48,6 +49,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(evidenceRoutes);
   await app.register(assertionRoutes);
   await app.register(verdictRoutes);
+  await app.register(oracleRoutes);
 
   app.setNotFoundHandler((_req, reply) => {
     reply.code(404).send({ error: "Not Found" });

@@ -31,6 +31,13 @@ const schema = z.object({
   SENTRY_DSN: z.string().optional(),
 
   /**
+   * AviationStack API key for the Insurance app's flight-delay oracle.
+   * When absent, POST /api/oracle/flight returns 503 and the claim UI
+   * hides the "fetch snapshot" tab.
+   */
+  AVIATIONSTACK_API_KEY: z.string().optional(),
+
+  /**
    * When "true", the API process also runs the judgment + appeal
    * workers and the chain indexer. Convenient for dev and for the
    * hackathon's single-Hetzner deploy. Production at scale should run

@@ -17,6 +17,18 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
     ts: Date.now(),
   }));
 
+  /**
+   * Feature flags derived from the server's env configuration. The
+   * frontend uses this to decide which optional surfaces to render
+   * (e.g. the flight-snapshot tab on the Insurance claim dialog only
+   * shows up when AVIATIONSTACK_API_KEY is set).
+   */
+  app.get("/features", async () => ({
+    oracles: {
+      flight: Boolean(process.env.AVIATIONSTACK_API_KEY?.trim()),
+    },
+  }));
+
   app.get("/ready", async (_req, reply) => {
     const checks: Record<string, "ok" | string> = {};
     try {
