@@ -138,6 +138,43 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
         emit FeeSinkUpdated(previous, newSink);
     }
 
+    /// @notice Admin escape hatch: resolve an assertion and settle bonds
+    ///         without dispatching the application callback.
+    ///
+    ///         Used when the application contract is broken (reverts on
+    ///         onVerdict, selfdestructed, etc.) and the assertion would
+    ///         otherwise be stuck forever. Skipping dispatch means the
+    ///         application's internal state will NOT advance — operators
+    ///         must reconcile off-chain or via a separate admin path on
+    ///         the application itself.
+    ///
+    ///         Accepts any outcome for OPEN / VERDICTED / CHALLENGED
+    ///         statuses so the admin can move the assertion into RESOLVED
+    ///         regardless of the branch it was stuck in.
+    function forceResolve(bytes32 id, Outcome forcedOutcome)
+        external
+        onlyRole(ADMIN_ROLE)
+        nonReentrant
+    {
+        Assertion storage a = _assertions[id];
+        if (!_exists[id]) revert AssertionMissing(id);
+        if (a.status == Status.RESOLVED) {
+            revert InvalidStatusTransition(a.status, Status.RESOLVED);
+        }
+        if (forcedOutcome == Outcome.PENDING || forcedOutcome == Outcome.ESCALATED) {
+            revert OutcomeCannotBePending();
+        }
+
+        a.status = Status.RESOLVED;
+        a.outcome = forcedOutcome;
+        a.resolvedAt = uint64(block.timestamp);
+
+        _settleBonds(a, forcedOutcome);
+        emit AssertionResolved(a.id, forcedOutcome, Status.RESOLVED);
+        // Deliberately no enforcer.dispatch — the whole point of this
+        // path is to route around a broken callback.
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // IAssertionRegistry — mutators
     // ─────────────────────────────────────────────────────────────────────
@@ -336,15 +373,18 @@ contract AssertionRegistry is IAssertionRegistry, AccessControl, ReentrancyGuard
 
         emit AssertionResolved(a.id, finalOutcome, Status.RESOLVED);
 
-        if (finalOutcome != Outcome.INVALID) {
-            enforcer.dispatch(
-                a.id,
-                a.callback,
-                a.callbackSelector,
-                finalOutcome,
-                a.reasoningRoot
-            );
-        }
+        // Fire the application callback for every outcome, including
+        // INVALID. Applications need the signal to unlock their own
+        // state machines (e.g. Escrow flips back out of DISPUTED, the
+        // insurance policy re-opens for a fresh claim). They are
+        // responsible for ignoring INVALID where that's the right call.
+        enforcer.dispatch(
+            a.id,
+            a.callback,
+            a.callbackSelector,
+            finalOutcome,
+            a.reasoningRoot
+        );
     }
 
     function _settleBonds(Assertion storage a, Outcome finalOutcome) internal {

@@ -197,7 +197,12 @@ describe("AssertionRegistry — INSTANT verdict flow", () => {
     const feeBalAfter = await ethers.provider.getBalance(feeSink.address);
 
     expect(feeBalAfter - feeBalBefore).to.equal(bond);
-    expect((await sink.calls()).length).to.equal(0);
+    // INVALID outcomes now dispatch through the enforcer so application
+    // contracts can reset their own state (Escrow unlocks DISPUTED,
+    // insurance surfaces rescueInvalidClaim, etc.). The sink records
+    // the call just like any other outcome; the bond still goes to the
+    // fee sink because nobody "won".
+    expect((await sink.calls()).length).to.equal(1);
   });
 
   it("rejects submitVerdict from non-JUDGE_ROLE", async () => {
@@ -371,8 +376,8 @@ describe("AssertionRegistry — AUDITED flow", () => {
 
     const a = await registry.getAssertion(id);
     expect(a.outcome).to.equal(BigInt(Outcome.INVALID));
-    // Callback NOT dispatched on INVALID.
-    expect((await sink.calls()).length).to.equal(0);
+    // Callback IS dispatched on INVALID so applications can reset.
+    expect((await sink.calls()).length).to.equal(1);
   });
 
   it("rejects zero-bond challenges on AUDITED assertions", async () => {

@@ -640,6 +640,24 @@
         "internalType": "bytes32",
         "name": "id",
         "type": "bytes32"
+      },
+      {
+        "internalType": "enum IVerdictTypes.Outcome",
+        "name": "forcedOutcome",
+        "type": "uint8"
+      }
+    ],
+    "name": "forceResolve",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "id",
+        "type": "bytes32"
       }
     ],
     "name": "getAssertion",

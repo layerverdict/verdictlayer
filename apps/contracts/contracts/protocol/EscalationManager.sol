@@ -179,6 +179,13 @@ contract EscalationManager is AccessControl, IVerdictTypes {
             ap.invalidVotes
         );
 
+        // Close the registry side FIRST so reputation updates only
+        // happen if the outcome actually lands on-chain. If
+        // resolveAssertion reverts (e.g. enforcer dispatch to a broken
+        // callback), we'd otherwise leave the reputation scoreboard
+        // out of sync with the canonical state.
+        registry.resolveAssertion(assertionId, finalOutcome);
+
         for (uint8 i = 0; i < PANEL_SIZE; i++) {
             bool agreed = ap.panelOutcomes[i] == finalOutcome;
             reputation.recordVerdict(ap.panelTokenIds[i], agreed);
@@ -187,8 +194,6 @@ contract EscalationManager is AccessControl, IVerdictTypes {
         if (finalOutcome != ap.originalOutcome && ap.originalJudgeTokenId != 0) {
             reputation.recordAppealLost(ap.originalJudgeTokenId);
         }
-
-        registry.resolveAssertion(assertionId, finalOutcome);
     }
 
     // ─────────────────────────────────────────────────────────────────────

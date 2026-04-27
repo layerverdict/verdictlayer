@@ -198,11 +198,12 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
     }
 
     /// @notice Escape hatch for a claim that the judge ruled INVALID.
-    ///         Because INVALID outcomes never reach the enforcer, the
-    ///         policy would otherwise be stuck in CLAIM_PENDING forever.
-    ///         The holder may call this once the registry has actually
-    ///         resolved the assertion with an INVALID outcome, returning
-    ///         the policy to ACTIVE so they can re-claim.
+    ///         The enforcer now dispatches INVALID outcomes too, so this
+    ///         path is usually unnecessary — `onVerdict` flips the
+    ///         policy back to ACTIVE automatically. Kept as a safety
+    ///         valve for legacy assertions or a reverted callback,
+    ///         where the registry recorded INVALID but the application
+    ///         state never updated.
     function rescueInvalidClaim(uint256 policyId) external nonReentrant {
         Policy storage p = _policies[policyId];
         if (msg.sender != p.holder) revert NotHolder();
@@ -240,6 +241,12 @@ contract ParametricInsurance is VerdictConsumer, ReentrancyGuard {
         } else if (outcome == Outcome.FALSE) {
             // Claim denied: policy returns to ACTIVE so holder can refile on
             // subsequent events within the coverage window.
+            p.status = PolicyStatus.ACTIVE;
+            emit ClaimRejected(policyId, assertionId);
+        } else {
+            // Outcome.INVALID: judge couldn't decide. Flip back to
+            // ACTIVE automatically so the holder doesn't have to call
+            // rescueInvalidClaim as a separate step.
             p.status = PolicyStatus.ACTIVE;
             emit ClaimRejected(policyId, assertionId);
         }

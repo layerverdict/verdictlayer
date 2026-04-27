@@ -130,6 +130,13 @@ contract AuthenticityCertifier is VerdictConsumer, ReentrancyGuard {
         } else if (outcome == Outcome.FALSE) {
             c.status = CheckStatus.REJECTED;
             emit CheckRejected(checkId, c.assetHash);
+        } else {
+            // Outcome.INVALID: treat as REJECTED. The submitter can
+            // call submitCheck again with the same hashes (the salt
+            // differs per tx) instead of staring at a check stuck in
+            // PENDING.
+            c.status = CheckStatus.REJECTED;
+            emit CheckRejected(checkId, c.assetHash);
         }
     }
 

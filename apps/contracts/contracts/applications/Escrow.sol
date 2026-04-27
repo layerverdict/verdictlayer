@@ -251,9 +251,15 @@ contract Escrow is VerdictConsumer, ReentrancyGuard {
             e.status = EscrowStatus.RESOLVED_FREELANCER;
             e.token.safeTransfer(e.freelancer, e.amount);
         } else {
-            // Outcome.INVALID: registry won't actually dispatch us for that,
-            // but be defensive.
-            return;
+            // Outcome.INVALID: the judge couldn't decide. Reset to
+            // DELIVERED so the client can either accept the work or
+            // open a fresh dispute with better evidence, rather than
+            // waiting for the 30-day expiry safety valve.
+            e.status = EscrowStatus.DELIVERED;
+            e.clientEvidence = bytes32(0);
+            e.freelancerEvidence = bytes32(0);
+            e.disputeResponseDeadline = 0;
+            e.assertionId = bytes32(0);
         }
 
         emit ResolvedByVerdict(escrowId, assertionId, outcome);

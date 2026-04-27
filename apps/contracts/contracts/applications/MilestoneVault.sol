@@ -263,6 +263,13 @@ contract MilestoneVault is VerdictConsumer, ReentrancyGuard {
         } else if (outcome == Outcome.FALSE) {
             m.status = MilestoneStatus.REJECTED;
             emit MilestoneRejected(grantId, milestoneIndex);
+        } else {
+            // Outcome.INVALID: treat as REJECTED so the grantee can
+            // resubmit with better evidence. Leaving the slot in
+            // SUBMITTED would block it forever — submitMilestone only
+            // accepts PENDING or REJECTED.
+            m.status = MilestoneStatus.REJECTED;
+            emit MilestoneRejected(grantId, milestoneIndex);
         }
     }
 
