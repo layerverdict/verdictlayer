@@ -111,6 +111,53 @@ export interface ApiFeatures {
   };
 }
 
+export interface AssertionReasoning {
+  id: number;
+  assertionId: `0x${string}`;
+  judgeTokenId: number | null;
+  storageRoot: `0x${string}`;
+  outcome: "TRUE" | "FALSE" | "INVALID" | "PENDING";
+  confidence: string | null;
+  chatId: string | null;
+  teeAttestation: string | null;
+  createdAt: string;
+}
+
+export interface AssertionDetail {
+  assertion: {
+    id: `0x${string}`;
+    chainId: number;
+    claim: string;
+    mode: "INSTANT" | "AUDITED";
+    asserter: `0x${string}`;
+    bond: string;
+    callback: `0x${string}`;
+    challengePeriod: number;
+    outcome: "PENDING" | "TRUE" | "FALSE" | "INVALID";
+    reasoningRoot: `0x${string}` | null;
+    verdictTx: string | null;
+    verdictedAt: string | null;
+    createdAt: string;
+    resolvedAt: string | null;
+  };
+  evidence: Array<{
+    id: number;
+    rootHash: `0x${string}`;
+    uploader: `0x${string}`;
+    mime: string | null;
+    size: number | null;
+    metadata: Record<string, unknown> | null;
+    uploadedAt: string;
+  }>;
+  reasonings: AssertionReasoning[];
+}
+
+export async function getAssertionDetail(
+  assertionId: `0x${string}`,
+): Promise<AssertionDetail> {
+  return api<AssertionDetail>(`/api/assertions/${assertionId}`);
+}
+
 export async function getFeatures(): Promise<ApiFeatures> {
   return api<ApiFeatures>("/features");
 }

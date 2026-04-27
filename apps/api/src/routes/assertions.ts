@@ -1,9 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
+import { asc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getAssertion, listAssertions } from "../services/assertion.js";
 import { listEvidenceByAssertion } from "../services/evidence.js";
 import { getJudgmentQueue } from "../lib/queue.js";
+import { db, schema } from "../db/client.js";
 
 const ID = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 const ADDR = z.string().regex(/^0x[0-9a-fA-F]{40}$/);
@@ -41,7 +43,12 @@ export const assertionRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ error: "assertion not found" });
     }
     const evidence = await listEvidenceByAssertion(id);
-    return { assertion, evidence };
+    const reasonings = await db
+      .select()
+      .from(schema.reasoningLogs)
+      .where(eq(schema.reasoningLogs.assertionId, id))
+      .orderBy(asc(schema.reasoningLogs.createdAt));
+    return { assertion, evidence, reasonings };
   });
 
   app.post<{ Params: { id: string } }>(

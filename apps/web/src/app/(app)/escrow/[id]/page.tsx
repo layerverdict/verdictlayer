@@ -25,6 +25,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AppealPanel } from "@/components/verdict/appeal-panel";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { PageHeader } from "@/components/verdict/page-header";
@@ -179,6 +180,7 @@ function EscrowDetail({
         </Card>
 
         {activeAssertion ? <ReasoningStream assertionId={activeAssertion} /> : null}
+        {activeAssertion ? <AppealPanel assertionId={activeAssertion} /> : null}
       </div>
 
       <aside className="space-y-6">
