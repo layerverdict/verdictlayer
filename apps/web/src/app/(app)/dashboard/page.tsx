@@ -103,8 +103,14 @@ export default function DashboardPage() {
       functionName: APP_META.authenticity.totalFn,
     });
 
+  // Read from the deployed chain regardless of wallet state — the
+  // dashboard is public and totals should render without a connected
+  // wallet. Fall back to mainnet if the env var isn't set.
+  const chainId = Number(
+    process.env.NEXT_PUBLIC_CHAIN_ID ?? "16661",
+  );
   const { data: totals, isLoading } = useReadContracts({
-    contracts,
+    contracts: contracts.map((c) => ({ ...c, chainId })),
     query: { enabled: contracts.length > 0 },
   });
 

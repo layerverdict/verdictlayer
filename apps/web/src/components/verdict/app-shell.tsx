@@ -9,7 +9,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LoginButton } from "./login-button";
 import { VerdictLogo } from "./logo";
+import { zgMainnet } from "@/lib/web3/chains";
 import { cn } from "@/lib/utils";
+
+const CONFIGURED_CHAIN_ID = Number(
+  process.env.NEXT_PUBLIC_CHAIN_ID ?? zgMainnet.id,
+);
+const NETWORK_LABEL = CONFIGURED_CHAIN_ID === zgMainnet.id ? "Mainnet" : "Testnet";
 
 type NavIconName =
   | "dashboard"
@@ -111,7 +117,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <VerdictLogo className="text-white" />
               <span className="text-lg font-semibold tracking-tight">Verdict</span>
               <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/40 md:inline-block">
-                Mainnet
+                {NETWORK_LABEL}
               </span>
             </Link>
           </div>
