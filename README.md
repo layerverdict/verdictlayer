@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="apps/web/public/logo.png" alt="Verdict Layer" width="120" />
+<img src="apps/web/public/favicon.svg" alt="Verdict Layer" width="120" height="120" />
 
 # Verdict Layer
 
