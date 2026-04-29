@@ -1,4 +1,10 @@
-# Verdict — Verifiable AI Assertion Layer on 0G
+<div align="center">
+
+# Verdict
+
+### Verifiable AI Assertion Layer on 0G
+
+</div>
 
 Verdict is a single on-chain primitive that answers *"is this claim true?"* and
 hands back a TEE-attested AI verdict with cryptographically anchored reasoning.
@@ -16,46 +22,27 @@ same adjudication layer.
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `apps/contracts/`           | Hardhat + Solidity 0.8.24 (cancun). 9 contracts: protocol core + four app contracts. 83 unit tests.              |
 | `apps/api/`                 | Fastify + Drizzle + BullMQ + Redis. Chain indexer, judgment/appeal workers, REST endpoints, oracle integrations. |
-| `apps/web/`                 | Next.js 16 App Router (RSC-first). Four app dashboards + assertion history + judge reputation gallery.           |
 | `packages/shared/`          | Cross-workspace types, ABI re-exports, deployment manifests.                                                     |
-| `scripts/deploy-remote.sh`  | Server-side deploy script called by the GitHub Actions pipeline.                                                 |
-| `.github/workflows/`        | CI (typecheck + test + build on every push) and Deploy (auto-ship main on green CI).                             |
 
 ---
 
 ## Architecture
 
 ```
-Internet → Cloudflare (DNS + DDoS + edge cache)
-              ↓ HTTPS (Full Strict, Let's Encrypt via DNS-01)
-          Hetzner Cloud VPS (Ubuntu 24.04, ufw + fail2ban)
-          ├── Caddy :443 ──── reverse proxy + zstd/gzip
-          │   ├── verdictlayer.xyz          → Next.js :3000
-          │   └── api.verdictlayer.xyz      → Fastify :4000
-          ├── Docker Compose (loopback only)
-          │   ├── postgres:16  127.0.0.1:5432
-          │   └── redis:7      127.0.0.1:6379
-          └── systemd services
-              ├── verdict-api  (Fastify + BullMQ workers + chain indexer)
-              └── verdict-web  (Next.js production server)
-                  ↓
-          0G Galileo Testnet (chainId 16602)
-          ├── AssertionRegistry · VerdictEnforcer · EscalationManager
-          ├── ReputationRegistry (ERC-7857 soulbound judge NFT)
-          └── Escrow · ParametricInsurance · MilestoneVault · AuthenticityCertifier
-                  ↓
-          0G Compute TEE (Sealed Inference, GLM-5 / DeepSeek / Qwen3)
-          0G Storage (evidence + reasoning root hashes)
+0G Galileo Testnet (chainId 16602)
+├── AssertionRegistry · VerdictEnforcer · EscalationManager
+├── ReputationRegistry (ERC-7857 soulbound judge NFT)
+└── Escrow · ParametricInsurance · MilestoneVault · AuthenticityCertifier
+        ↓
+Fastify API + chain indexer + judgment/appeal workers (BullMQ)
+        ↓
+0G Compute TEE (Sealed Inference, GLM-5 / DeepSeek / Qwen3)
+0G Storage (evidence + reasoning root hashes)
 ```
 
-**Read path is server-rendered.** The browser never queries the chain for list
-pages or counters — the indexer mirrors every app event into Postgres and the
-Next.js RSC layer reads a typed Fastify endpoint. Cloudflare caches the HTML
-at the edge (5s TTL for lists, 2s for detail pages, tag-based invalidation).
-
-**Write path stays on-chain.** Every state transition still happens via signed
-transactions through `wagmi` + `viem`. The backend mirror exists purely as a
-read cache; the contract is authoritative.
+**Write path stays on-chain.** Every state transition happens via signed
+transactions through `wagmi` + `viem`. The indexer mirrors events into
+Postgres purely as a read cache; the contract is authoritative.
 
 ---
 
@@ -111,10 +98,6 @@ pnpm --filter @verdict/contracts exec hardhat run scripts/deploy.ts --network og
 # api — dev (hot reload) / tests
 pnpm --filter @verdict/api dev
 pnpm --filter @verdict/api test
-
-# web — dev / production build
-pnpm --filter @verdict/web dev
-pnpm --filter @verdict/web build
 ```
 
 ### Local data plane
@@ -155,35 +138,6 @@ pnpm --filter @verdict/api exec drizzle-kit migrate
 | AuthenticityCertifier   | `0x4745DE55e4037b87768AB63Be1F479E4361096c1`   |
 
 Explorer: <https://chainscan-galileo.0g.ai>
-
----
-
-## CI/CD
-
-- `.github/workflows/ci.yml` — runs on every push + PR. Parallel
-  typecheck, contracts tests (83 cases), API tests (20 cases), and a full
-  Next.js production build.
-- `.github/workflows/deploy.yml` — listens for a successful CI run on
-  `main`, then SSHes into the VPS as the `verdict` user and invokes
-  `scripts/deploy-remote.sh`. The script fast-forwards, installs, runs
-  pending migrations, builds, and restarts services — with a trap-rollback
-  to the previous commit if any step fails. Finishes by curl-checking
-  the public HTTPS endpoints.
-
----
-
-## Security
-
-- TLS: Let's Encrypt via Cloudflare DNS-01 challenge; Caddy renews automatically.
-- SSH: root login key-only; app user's sudo grant is narrowly scoped to
-  `systemctl restart verdict-*`.
-- Firewall: `ufw` allows 22/80/443 plus the Tailscale interface only.
-  Postgres + Redis bind to 127.0.0.1 and are never exposed publicly.
-- Auto-updates: `unattended-upgrades` applies security patches daily.
-- Bond-based anti-spam: every assertion creator posts a native-token bond;
-  INVALID outcomes slash to the fee sink.
-- ERC-7857 soulbound NFTs prevent reputation laundering — a bad judge
-  can't transfer their history away.
 
 ---
 
