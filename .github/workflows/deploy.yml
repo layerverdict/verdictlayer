@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  # Run after a successful CI workflow on main. This keeps the deploy
+  # gated on typecheck + tests + build without duplicating that work in
+  # this workflow.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Manual trigger for ad-hoc redeploys (e.g. env-only changes that
+  # don't need code review).
+  workflow_dispatch: {}
+
+# Only one deploy runs at a time — cancel any in-flight deploy if a
+# newer commit lands, so the newest commit wins.
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to verdictlayer.xyz
+    runs-on: ubuntu-latest
+    # Gate: only run if the CI that triggered us actually passed. The
+    # manual dispatch has no prior workflow_run context and skips the
+    # conclusion check.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    timeout-minutes: 15
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Trigger remote deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            'bash /srv/verdict/app/scripts/deploy-remote.sh'
+
+      - name: Verify public endpoints
+        run: |
+          set -e
+          echo "— API health"
+          curl -sf --max-time 10 https://api.verdictlayer.xyz/health
+          echo ""
+          echo "— API ready"
+          curl -sf --max-time 10 https://api.verdictlayer.xyz/ready
+          echo ""
+          echo "— Web homepage"
+          curl -sf -o /dev/null -w "http=%{http_code} total=%{time_total}s\n" \
+            --max-time 10 https://verdictlayer.xyz/dashboard
