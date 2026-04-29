@@ -60,6 +60,35 @@ export interface JudgeOutput {
   latencyMs: number;
 }
 
+// How long to wait for the client's /api/evidence/attach call to catch
+// up with the on-chain AssertionCreated event. Real-world latency is
+// 1–3s; we give it a little more so congested blocks don't blow past.
+const EVIDENCE_WAIT_MS = 15_000;
+
+/**
+ * Read how many evidenceRoots the on-chain assertion carries. The
+ * client must have attached at least that many DB rows before we
+ * hand the prompt to the TEE — otherwise the judge sees an empty
+ * evidence list and returns INVALID.
+ */
+async function readExpectedEvidenceCount(
+  assertionId: `0x${string}`,
+): Promise<number> {
+  try {
+    const { assertionRegistry } = await getContracts();
+    const a = (await assertionRegistry
+      .getFunction("getAssertion")
+      .staticCall(assertionId)) as unknown as { evidenceRoots?: unknown[] };
+    return Array.isArray(a.evidenceRoots) ? a.evidenceRoots.length : 0;
+  } catch (err) {
+    logger.warn(
+      { err, assertionId },
+      "could not read evidenceRoots from chain; proceeding without attach wait",
+    );
+    return 0;
+  }
+}
+
 export async function judge(input: JudgeInput): Promise<JudgeOutput> {
   const { assertionId } = input;
   const publish = (kind: "status" | "error" | "outcome" | "done", payload: unknown) =>
@@ -76,7 +105,32 @@ export async function judge(input: JudgeInput): Promise<JudgeOutput> {
       throw new Error(`assertion ${assertionId} already resolved (${assertion.outcome})`);
     }
 
-    const evidenceRows = await listEvidenceByAssertion(assertionId);
+    // The indexer enqueues us the moment it sees AssertionCreated, but
+    // the client's POST /api/evidence/attach call races behind the TX
+    // receipt — if we start inference first, the TEE sees an empty
+    // evidence list and correctly returns INVALID. Read the expected
+    // root count from on-chain and give the attach step a brief window
+    // to catch up before giving up.
+    const expectedRootCount = await readExpectedEvidenceCount(assertionId);
+    let evidenceRows = await listEvidenceByAssertion(assertionId);
+    if (expectedRootCount > 0 && evidenceRows.length < expectedRootCount) {
+      const deadline = Date.now() + EVIDENCE_WAIT_MS;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 1500));
+        evidenceRows = await listEvidenceByAssertion(assertionId);
+        if (evidenceRows.length >= expectedRootCount) break;
+      }
+      if (evidenceRows.length < expectedRootCount) {
+        logger.warn(
+          {
+            assertionId,
+            have: evidenceRows.length,
+            expected: expectedRootCount,
+          },
+          "proceeding with partial evidence — attach never arrived",
+        );
+      }
+    }
     publish("status", { phase: "evidence", count: evidenceRows.length });
 
     const evidence = await materialiseAll(evidenceRows);
