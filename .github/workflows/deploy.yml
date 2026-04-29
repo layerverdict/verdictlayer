@@ -38,21 +38,18 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          # Secret is the base64-encoded OpenSSH private key. Base64
+          # encoding sidesteps every CRLF / newline / indent landmine
+          # we've hit pasting the raw PEM into the GitHub UI.
+          DEPLOY_SSH_KEY_B64: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          # Piping via env var preserves the newlines in the OpenSSH key
-          # block; interpolating directly into `echo` mangles them on
-          # some shells. `printf '%s\n'` is explicit — end with a final
-          # newline so ssh-keygen doesn't complain about the key.
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s' "$DEPLOY_SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          # Validate the key upfront — a copy-paste bug surfaces here
+          # Validate the key upfront so a copy-paste bug surfaces here
           # with a clear error instead of a confusing ssh auth failure.
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null
-          # Populate known_hosts; keep stderr visible so a keyscan
-          # timeout or DNS issue is debuggable from the run log.
           ssh-keyscan -T 10 -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
 
       - name: Trigger remote deploy
