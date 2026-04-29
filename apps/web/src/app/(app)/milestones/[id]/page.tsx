@@ -1,17 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { type Address, decodeEventLog } from "viem";
-import {
-  useAccount,
-  useChainId,
-  usePublicClient,
-  useReadContract,
-  useReadContracts,
-  useWriteContract,
-} from "wagmi";
+import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,71 +10,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { PageHeader } from "@/components/verdict/page-header";
-import { ReasoningStream } from "@/components/verdict/reasoning-stream";
-import { attachEvidence } from "@/lib/api";
-import {
-  formatAmount,
-  formatTimestamp,
-  isZeroHash,
-  truncateAddress,
-  truncateHash,
-} from "@/lib/format";
+import { formatAmount, formatTimestamp, truncateAddress } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { abis } from "@/lib/web3/abis";
+import { getGrant, type GrantRow } from "@/lib/api-server";
 import { maybeContractAddress } from "@/lib/web3/addresses";
-import { explorerAddress } from "@/lib/web3/chains";
-import {
-  MILESTONE_STATUS,
-  MILESTONE_STATUS_LABEL,
-  decodeMilestoneStatus,
-  type GrantSummary,
-  type Milestone,
-  type MilestoneStatus,
-} from "@/lib/web3/milestones";
-import { runTx } from "@/lib/web3/tx";
+import { explorerAddress, zgMainnet } from "@/lib/web3/chains";
 
-export default function GrantDetailPage() {
-  const params = useParams<{ id: string }>();
-  const rawId = params?.id ?? "";
+import { MilestoneList } from "./milestone-list";
+
+export const dynamic = "force-dynamic";
+
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? zgMainnet.id);
+
+export default async function GrantDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id: rawId } = await params;
   const vaultAddress = maybeContractAddress("milestoneVault");
 
-  let parsedId: bigint | null = null;
-  try {
-    if (/^\d+$/.test(rawId)) parsedId = BigInt(rawId);
-  } catch {
-    parsedId = null;
-  }
-
-  if (!parsedId || parsedId <= 0n) {
-    return (
-      <div className="space-y-8">
-        <PageHeader
-          eyebrow="Grant"
-          title="Not found"
-          description="That grant id isn't a positive integer."
-          action={
-            <Button variant="ghost" asChild>
-              <Link href="/milestones">Back to list</Link>
-            </Button>
-          }
-        />
-      </div>
-    );
-  }
-
-  const id = parsedId;
+  if (!/^\d+$/.test(rawId)) notFound();
+  const id = Number(rawId);
+  if (!Number.isInteger(id) || id <= 0) notFound();
 
   return (
     <div className="space-y-8">
@@ -114,182 +61,77 @@ export default function GrantDetailPage() {
           </CardHeader>
         </Card>
       ) : (
-        <GrantDetail id={id} vaultAddress={vaultAddress} />
+        <GrantDetailBody id={id} vaultAddress={vaultAddress} />
       )}
     </div>
   );
 }
 
-function GrantDetail({
+async function GrantDetailBody({
   id,
   vaultAddress,
 }: {
-  id: bigint;
-  vaultAddress: Address;
+  id: number;
+  vaultAddress: `0x${string}`;
 }) {
-  const chainId = useChainId();
-  const { address } = useAccount();
-
-  const grant = useReadContract({
-    address: vaultAddress,
-    abi: abis.milestoneVault,
-    functionName: "getGrant",
-    args: [id],
-  });
-
-  const bond = useReadContract({
-    address: vaultAddress,
-    abi: abis.milestoneVault,
-    functionName: "assertionBond",
-  }) as { data: bigint | undefined };
-
-  const summary: GrantSummary | null = useMemo(() => {
-    if (!grant.data) return null;
-    const t = grant.data as unknown as readonly [
-      `0x${string}`,
-      `0x${string}`,
-      `0x${string}`,
-      bigint,
-      bigint,
-      bigint,
-      boolean,
-      bigint,
-    ];
-    return {
-      dao: t[0],
-      grantee: t[1],
-      token: t[2],
-      totalAmount: t[3],
-      releasedAmount: t[4],
-      grantExpiresAt: t[5],
-      reclaimed: t[6],
-      milestoneCount: t[7],
-    };
-  }, [grant.data]);
-
-  const milestoneIndexes = useMemo(
-    () =>
-      summary
-        ? Array.from({ length: Number(summary.milestoneCount) }, (_, i) => i)
-        : [],
-    [summary],
-  );
-
-  const milestoneReads = useReadContracts({
-    contracts: milestoneIndexes.map((i) => ({
-      address: vaultAddress,
-      abi: abis.milestoneVault,
-      functionName: "getMilestone",
-      args: [id, BigInt(i)],
-    })),
-    query: { enabled: milestoneIndexes.length > 0 },
-  });
-
-  if (grant.isLoading || !summary) {
+  const res = await getGrant(id);
+  if (!res) {
     return (
-      <div className="grid gap-4">
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Grant not found</CardTitle>
+          <CardDescription>
+            No grant with id <span className="font-mono">#{id}</span> exists on
+            this chain yet. The indexer may still be catching up — try again in
+            a few seconds.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     );
   }
 
-  const role =
-    address?.toLowerCase() === summary.dao.toLowerCase()
-      ? "dao"
-      : address?.toLowerCase() === summary.grantee.toLowerCase()
-        ? "grantee"
-        : "observer";
+  const grant = res.grant;
 
   return (
     <div className="space-y-6">
-      <OverviewCard
-        id={id}
-        summary={summary}
-        chainId={chainId}
+      <OverviewCard id={id} grant={grant} vaultAddress={vaultAddress} />
+      <MilestoneList
+        grantId={id}
+        chainId={CHAIN_ID}
         vaultAddress={vaultAddress}
-        role={role}
+        dao={grant.dao}
+        grantee={grant.grantee}
+        milestoneCount={grant.milestoneCount}
+        grantExpiresAt={grant.grantExpiresAt}
+        reclaimed={false}
       />
-
-      <ReclaimRow
-        id={id}
-        summary={summary}
-        role={role}
-        chainId={chainId}
-        vaultAddress={vaultAddress}
-        onDone={() => grant.refetch()}
-      />
-
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-white">Milestones</h2>
-        {milestoneReads.isLoading ? (
-          <div className="grid gap-3">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-32 w-full" />
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {milestoneIndexes.map((i) => {
-              const res = milestoneReads.data?.[i];
-              if (!res || res.status !== "success") return null;
-              const m = res.result as unknown as Milestone;
-              return (
-                <MilestoneCard
-                  key={i}
-                  grantId={id}
-                  index={i}
-                  milestone={m}
-                  role={role}
-                  grantee={summary.grantee}
-                  vaultAddress={vaultAddress}
-                  chainId={chainId}
-                  bond={bond.data ?? 0n}
-                  onRefetch={() => {
-                    void milestoneReads.refetch();
-                    void grant.refetch();
-                  }}
-                />
-              );
-            })}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
 function OverviewCard({
   id,
-  summary,
-  chainId,
+  grant,
   vaultAddress,
-  role,
 }: {
-  id: bigint;
-  summary: GrantSummary;
-  chainId: number;
-  vaultAddress: Address;
-  role: "dao" | "grantee" | "observer";
+  id: number;
+  grant: GrantRow;
+  vaultAddress: `0x${string}`;
 }) {
-  const progress =
-    summary.totalAmount > 0n
-      ? Number((summary.releasedAmount * 100n) / summary.totalAmount)
-      : 0;
+  const released = BigInt(grant.releasedAmount);
+  const total = BigInt(grant.totalAmount);
+  const progress = total > 0n ? Number((released * 100n) / total) : 0;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-wrap items-center gap-3">
-          <CardTitle className="text-2xl">Grant #{id.toString()}</CardTitle>
-          <Badge variant="outline">
-            {summary.milestoneCount.toString()} milestones
-          </Badge>
-          <Badge variant="secondary">you are {role}</Badge>
-          {summary.reclaimed ? <Badge variant="warning">reclaimed</Badge> : null}
+          <CardTitle className="text-2xl">Grant #{id}</CardTitle>
+          <Badge variant="outline">{grant.milestoneCount} milestones</Badge>
         </div>
         <CardDescription>
           <a
-            href={explorerAddress(chainId, vaultAddress)}
+            href={explorerAddress(CHAIN_ID, vaultAddress)}
             target="_blank"
             rel="noreferrer"
             className="font-mono text-[11px] hover:text-white/70"
@@ -301,12 +143,12 @@ function OverviewCard({
       <CardContent className="space-y-4">
         <div className="flex items-end justify-between gap-3">
           <div className="font-mono text-3xl text-white">
-            {formatAmount(summary.releasedAmount)}
+            {formatAmount(released)}
             <span className="mx-2 text-white/30">/</span>
-            {formatAmount(summary.totalAmount)}
+            {formatAmount(total)}
           </div>
           <span className="font-mono text-[11px] text-white/40">
-            {truncateAddress(summary.token, 4)} · {progress}% released
+            {truncateAddress(grant.token, 4)} · {progress}% released
           </span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
@@ -316,15 +158,15 @@ function OverviewCard({
           />
         </div>
         <div className="grid gap-3 pt-2 sm:grid-cols-2">
-          <Field label="DAO" value={truncateAddress(summary.dao, 6)} mono />
+          <Field label="DAO" value={truncateAddress(grant.dao, 6)} mono />
           <Field
             label="Grantee"
-            value={truncateAddress(summary.grantee, 6)}
+            value={truncateAddress(grant.grantee, 6)}
             mono
           />
           <Field
             label="Expires"
-            value={formatTimestamp(Number(summary.grantExpiresAt) * 1000)}
+            value={formatTimestamp(new Date(grant.grantExpiresAt).getTime())}
           />
         </div>
       </CardContent>
@@ -350,275 +192,5 @@ function Field({
         {value}
       </div>
     </div>
-  );
-}
-
-function ReclaimRow({
-  id,
-  summary,
-  role,
-  chainId,
-  vaultAddress,
-  onDone,
-}: {
-  id: bigint;
-  summary: GrantSummary;
-  role: "dao" | "grantee" | "observer";
-  chainId: number;
-  vaultAddress: Address;
-  onDone: () => void;
-}) {
-  const { writeContractAsync } = useWriteContract();
-  const nowSec = Math.floor(Date.now() / 1000);
-  const expired = nowSec > Number(summary.grantExpiresAt);
-  if (role !== "dao" || !expired || summary.reclaimed) return null;
-
-  async function onReclaim() {
-    await runTx(
-      writeContractAsync({
-        address: vaultAddress,
-        abi: abis.milestoneVault,
-        functionName: "reclaim",
-        args: [id],
-      }),
-      {
-        chainId,
-        pending: "Reclaiming residue…",
-        success: "Residue returned",
-      },
-    );
-    onDone();
-  }
-
-  return (
-    <Card className="border-warning/30 bg-warning/10">
-      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="text-sm font-medium text-white">
-            Grant window closed
-          </div>
-          <div className="text-xs text-white/60">
-            Unreleased milestones are stuck. Reclaim the residue back to the DAO.
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={onReclaim}>
-          Reclaim residue
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MilestoneCard({
-  grantId,
-  index,
-  milestone,
-  role,
-  grantee,
-  vaultAddress,
-  chainId,
-  bond,
-  onRefetch,
-}: {
-  grantId: bigint;
-  index: number;
-  milestone: Milestone;
-  role: "dao" | "grantee" | "observer";
-  grantee: Address;
-  vaultAddress: Address;
-  chainId: number;
-  bond: bigint;
-  onRefetch: () => void;
-}) {
-  const status = decodeMilestoneStatus(milestone.status);
-  const assertionId =
-    isZeroHash(milestone.assertionId) ? null : milestone.assertionId;
-
-  const canSubmit =
-    role === "grantee" &&
-    (status === MILESTONE_STATUS.PENDING || status === MILESTONE_STATUS.REJECTED);
-
-  return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <CardTitle className="text-base">Milestone #{index + 1}</CardTitle>
-            <StatusBadge status={status} />
-          </div>
-          <CardDescription className="max-w-2xl whitespace-pre-wrap">
-            {milestone.criteria}
-          </CardDescription>
-        </div>
-        <div className="text-right">
-          <div className="font-mono text-lg text-white">
-            {formatAmount(milestone.amount)}
-          </div>
-          <div className="font-mono text-[11px] text-white/40">
-            slice amount
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 pt-0">
-        {!isZeroHash(milestone.evidenceRoot) ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 font-mono text-[11px] text-white/60">
-            evidence · {truncateHash(milestone.evidenceRoot, 12, 10)}
-          </div>
-        ) : null}
-
-        {assertionId && status === MILESTONE_STATUS.SUBMITTED ? (
-          <ReasoningStream assertionId={assertionId} />
-        ) : null}
-
-        {canSubmit ? (
-          <MilestoneSubmitDialog
-            grantId={grantId}
-            milestoneIndex={index}
-            vaultAddress={vaultAddress}
-            chainId={chainId}
-            bond={bond}
-            grantee={grantee}
-            onDone={onRefetch}
-            isResubmit={status === MILESTONE_STATUS.REJECTED}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatusBadge({ status }: { status: MilestoneStatus }) {
-  switch (status) {
-    case MILESTONE_STATUS.RELEASED:
-      return <Badge variant="success">{MILESTONE_STATUS_LABEL[status]}</Badge>;
-    case MILESTONE_STATUS.REJECTED:
-      return <Badge variant="danger">{MILESTONE_STATUS_LABEL[status]}</Badge>;
-    case MILESTONE_STATUS.SUBMITTED:
-      return <Badge variant="info">{MILESTONE_STATUS_LABEL[status]}</Badge>;
-    case MILESTONE_STATUS.PENDING:
-    default:
-      return <Badge variant="outline">{MILESTONE_STATUS_LABEL[status]}</Badge>;
-  }
-}
-
-function MilestoneSubmitDialog({
-  grantId,
-  milestoneIndex,
-  vaultAddress,
-  chainId,
-  bond,
-  grantee,
-  onDone,
-  isResubmit,
-}: {
-  grantId: bigint;
-  milestoneIndex: number;
-  vaultAddress: Address;
-  chainId: number;
-  bond: bigint;
-  grantee: Address;
-  onDone: () => void;
-  isResubmit: boolean;
-}) {
-  const { writeContractAsync } = useWriteContract();
-  const publicClient = usePublicClient();
-  const [open, setOpen] = useState(false);
-  const [rootHash, setRootHash] = useState<`0x${string}` | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit() {
-    if (!rootHash || !publicClient) return;
-    try {
-      setSubmitting(true);
-      const hash = await runTx(
-        writeContractAsync({
-          address: vaultAddress,
-          abi: abis.milestoneVault,
-          functionName: "submitMilestone",
-          args: [grantId, BigInt(milestoneIndex), rootHash],
-          value: bond,
-        }),
-        {
-          chainId,
-          pending: isResubmit
-            ? "Resubmitting with new evidence…"
-            : "Submitting milestone evidence…",
-          success: "Milestone submitted",
-        },
-      );
-
-      // MilestoneSubmitted embeds the assertionId; decode it and attach
-      // the previously-uploaded raw evidence row.
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      let assertionId: `0x${string}` | null = null;
-      for (const log of receipt.logs) {
-        try {
-          const decoded = decodeEventLog({
-            abi: abis.milestoneVault,
-            topics: [...log.topics] as [`0x${string}`, ...`0x${string}`[]],
-            data: log.data,
-          });
-          if (
-            decoded.eventName === "MilestoneSubmitted" &&
-            decoded.args &&
-            "assertionId" in decoded.args
-          ) {
-            assertionId = (decoded.args as { assertionId: `0x${string}` }).assertionId;
-            break;
-          }
-        } catch {
-          // Not a MilestoneVault log — skip.
-        }
-      }
-
-      if (assertionId) {
-        try {
-          await attachEvidence({ rootHash, assertionId, uploader: grantee });
-        } catch (err) {
-          console.warn("attachEvidence failed", err);
-        }
-      }
-
-      onDone();
-      setOpen(false);
-      setRootHash(null);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="w-full">
-          {isResubmit ? "Resubmit evidence" : "Submit evidence"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {isResubmit ? "Resubmit milestone" : "Submit milestone"}
-          </DialogTitle>
-          <DialogDescription>
-            Upload the deliverable. The judge compares it against the criteria
-            text attached to this milestone. Bond is{" "}
-            <span className="font-mono text-white/80">{formatAmount(bond)} 0G</span>.
-          </DialogDescription>
-        </DialogHeader>
-        <EvidenceUploader
-          uploader={grantee}
-          onUploaded={(res) => setRootHash(res.rootHash)}
-        />
-        <DialogFooter>
-          <Button
-            disabled={!rootHash || submitting}
-            onClick={submit}
-            className="w-full sm:w-auto"
-          >
-            {submitting ? "Submitting…" : `Submit · ${formatAmount(bond)} bond`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
