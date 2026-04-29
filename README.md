@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="apps/web/public/logo.png" alt="Verdict Layer" width="120" />
+
 # Verdict Layer
 
 ### Verifiable AI decisions on 0G
