@@ -1,9 +1,20 @@
 /**
- * Storage service — thin wrapper over `@0glabs/0g-ts-sdk` Indexer.
+ * Storage service — uploads evidence + reasoning docs to 0G Storage.
  *
- * All evidence and reasoning documents flow through here. The SDK
- * expects a file path, so buffers are written to a temp file, uploaded,
- * and cleaned up in a `finally` block.
+ * Why we don't just call `indexer.upload()` directly: the 0G mainnet
+ * Flow contract was upgraded to a new `submit` ABI that wraps the
+ * old `Submission` struct inside `{ data, submitter }`, changing the
+ * function selector from 0xef3e12dc → 0xbc8c11f8. @0glabs/0g-ts-sdk
+ * 0.3.3 (current latest on npm) still sends the old selector, which
+ * the upgraded Flow rejects with `require(false)` and empty revert
+ * data — hence the "Failed to submit transaction: execution reverted
+ * (require(false))" error we hit in production.
+ *
+ * Fix: submit the TX ourselves with the new ABI, then hand the file
+ * to the SDK with `skipTx=true` so it just performs segment upload +
+ * finality wait. Segment upload, merkle tree, and downloader code
+ * paths in the SDK are untouched by the Flow ABI change, so reusing
+ * them is safe.
  *
  * Reference: skills/storage/upload-file/SKILL.md +
  *            skills/storage/download-file/SKILL.md
@@ -16,12 +27,53 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import { Indexer, ZgFile } from "@0glabs/0g-ts-sdk";
+import { ethers } from "ethers";
 
 import { config } from "../config.js";
-import { getSigner } from "./../lib/chain.js";
+import { getProvider, getSigner } from "./../lib/chain.js";
 import { logger } from "../lib/logger.js";
 
 let cachedIndexer: Indexer | undefined;
+
+// Minimal Flow ABI, updated for the mainnet Submission-with-submitter
+// shape. Selector keccak256(submit(((uint256,bytes,(bytes32,uint256)[]),address)))
+// = 0xbc8c11f8 — verified against a successful on-chain TX.
+const FLOW_SUBMIT_ABI = [
+  "function market() view returns (address)",
+  "function submit(((uint256 length, bytes tags, (bytes32 root, uint256 height)[] nodes) data, address submitter)) payable returns (uint256, bytes32)",
+];
+const MARKET_ABI = ["function pricePerSector() view returns (uint256)"];
+
+// The Flow contract address the SDK would pick comes from the storage
+// node's self-reported networkIdentity. Cached per indexer URL.
+let cachedFlowAddress: string | undefined;
+async function resolveFlowAddress(): Promise<string> {
+  if (cachedFlowAddress) return cachedFlowAddress;
+  const sharded = await (getIndexer() as unknown as {
+    getShardedNodes: () => Promise<{ trusted: { url: string }[] }>;
+  }).getShardedNodes();
+  const firstNode = sharded.trusted?.[0];
+  if (!firstNode) {
+    throw new Error("storage indexer returned no trusted nodes");
+  }
+  const res = await fetch(firstNode.url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "zgs_getStatus",
+      params: [],
+    }),
+  });
+  const json = (await res.json()) as {
+    result?: { networkIdentity?: { flowAddress?: string } };
+  };
+  const flow = json.result?.networkIdentity?.flowAddress;
+  if (!flow) throw new Error("storage node did not report a flowAddress");
+  cachedFlowAddress = ethers.getAddress(flow);
+  return cachedFlowAddress;
+}
 
 export function getIndexer(): Indexer {
   if (!cachedIndexer) {
@@ -84,6 +136,15 @@ export async function uploadBuffer(data: Buffer, label = "blob"): Promise<Upload
 /**
  * Upload an existing file. Caller owns the file lifecycle — we don't
  * delete it.
+ *
+ * Flow:
+ *   1. Merkle-tree the file + build the old-shape Submission.
+ *   2. Submit on-chain ourselves using the new Flow ABI (adds
+ *      `submitter` to the tuple) — the SDK's own submitter targets
+ *      the pre-upgrade ABI and reverts on mainnet.
+ *   3. Hand the file to the SDK with `skipTx=true` so it picks up
+ *      our tx via `findExistingFileInfo(rootHash)` and uploads
+ *      segments + waits for finality.
  */
 export async function uploadPath(path: string): Promise<UploadResult> {
   const stats = await fsp.stat(path);
@@ -96,19 +157,87 @@ export async function uploadPath(path: string): Promise<UploadResult> {
     const rootHash = tree?.rootHash();
     if (!rootHash) throw new Error("merkle tree produced no root hash");
 
-    // 0G SDK's CJS types expose a different ethers Signer symbol than
-    // our ESM ethers.Wallet even though both point at the same runtime
-    // module — cast through unknown to bridge the nominal mismatch.
-    const [tx, uploadErr] = await getIndexer().upload(
+    const [submission, submissionErr] = await file.createSubmission("0x");
+    if (submissionErr || !submission) {
+      throw new Error(`createSubmission failed: ${submissionErr ?? "null"}`);
+    }
+
+    const signer = getSigner();
+    const flowAddress = await resolveFlowAddress();
+    const flow = new ethers.Contract(flowAddress, FLOW_SUBMIT_ABI, signer);
+
+    let pricePerSector: bigint;
+    try {
+      const marketAddr = (await flow.getFunction("market").staticCall()) as string;
+      const market = new ethers.Contract(marketAddr, MARKET_ABI, getProvider());
+      pricePerSector = (await market
+        .getFunction("pricePerSector")
+        .staticCall()) as bigint;
+    } catch (err) {
+      throw new Error(
+        `failed to read Flow market / pricePerSector: ${(err as Error).message}`,
+      );
+    }
+
+    let sectors = 0;
+    for (const node of submission.nodes) {
+      sectors += 1 << Number(node.height.toString());
+    }
+    const fee = BigInt(sectors) * pricePerSector;
+
+    const submissionTuple = {
+      data: {
+        length: BigInt(submission.length.toString()),
+        tags: submission.tags ?? "0x",
+        nodes: submission.nodes.map((n) => ({
+          root: n.root,
+          height: BigInt(n.height.toString()),
+        })),
+      },
+      submitter: signer.address,
+    };
+
+    let txHash: string;
+    try {
+      const resp = await flow
+        .getFunction("submit")
+        .send(submissionTuple, { value: fee });
+      const receipt = await resp.wait();
+      if (!receipt || receipt.status !== 1) {
+        throw new Error(
+          `Flow.submit receipt not successful (status=${receipt?.status})`,
+        );
+      }
+      txHash = receipt.hash;
+    } catch (err) {
+      throw new Error(`Flow.submit failed: ${(err as Error).message}`);
+    }
+
+    // Hand the file to the SDK uploader with skipTx=true — it will
+    // find our on-chain entry via getFileInfo(rootHash) and proceed
+    // straight to segment upload + finality wait.
+    const [, uploadErr] = await getIndexer().upload(
       file,
       config.RPC_URL,
-      getSigner() as unknown as Parameters<typeof Indexer.prototype.upload>[2],
+      signer as unknown as Parameters<typeof Indexer.prototype.upload>[2],
+      {
+        tags: "0x",
+        finalityRequired: true,
+        taskSize: 10,
+        expectedReplica: 1,
+        skipTx: true,
+        fee: 0n,
+      },
     );
-    if (uploadErr) throw new Error(`upload failed: ${uploadErr.message ?? uploadErr}`);
+    if (uploadErr) {
+      throw new Error(
+        `segment upload failed after on-chain submit ${txHash}: ${uploadErr.message ?? uploadErr}`,
+      );
+    }
 
     return {
       rootHash: rootHash as `0x${string}`,
-      txHash: String(tx),
+      txHash,
       size: stats.size,
     };
   } finally {
