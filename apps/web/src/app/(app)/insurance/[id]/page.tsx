@@ -179,7 +179,7 @@ function PolicyDetail({
           <CardHeader>
             <CardTitle>Trigger condition</CardTitle>
             <CardDescription>
-              Verdict reads this verbatim when the claim is filed.
+              The Verdict Layer judge reads this verbatim when the claim is filed.
             </CardDescription>
           </CardHeader>
           <CardContent>

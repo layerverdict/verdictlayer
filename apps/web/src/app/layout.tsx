@@ -20,15 +20,15 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Verdict — Verifiable AI Assertion Layer",
-    template: "%s · Verdict",
+    default: "Verdict Layer — Verifiable AI Decisions on 0G",
+    template: "%s · Verdict Layer",
   },
   description:
     "One primitive. TEE-attested judges. On-chain verdicts. Built on 0G.",
-  metadataBase: new URL("https://verdict.xyz"),
+  metadataBase: new URL("https://verdictlayer.xyz"),
   keywords: [
     "0G",
-    "verdict",
+    "verdict layer",
     "TEE",
     "AI",
     "decentralized arbitration",
@@ -39,16 +39,16 @@ export const metadata: Metadata = {
     "blockchain",
   ],
   openGraph: {
-    title: "Verdict — Verifiable AI Assertion Layer",
+    title: "Verdict Layer — Verifiable AI Decisions on 0G",
     description:
       "One primitive. TEE-attested judges. On-chain verdicts. Built on 0G.",
-    url: "https://verdict.xyz",
-    siteName: "Verdict",
+    url: "https://verdictlayer.xyz",
+    siteName: "Verdict Layer",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Verdict — Verifiable AI Assertion Layer",
+    title: "Verdict Layer — Verifiable AI Decisions on 0G",
     description: "TEE-attested AI judges producing on-chain verdicts on 0G.",
   },
 };

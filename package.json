@@ -2,7 +2,7 @@
   "name": "verdict",
   "version": "0.1.0",
   "private": true,
-  "description": "Verdict — Verifiable AI Assertion Layer on 0G",
+  "description": "Verdict Layer — Verifiable AI decisions on 0G",
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=20.0.0",

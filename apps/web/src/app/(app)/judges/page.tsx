@@ -29,7 +29,7 @@ export default function JudgesPage() {
       <PageHeader
         eyebrow="Protocol · Judges"
         title="TEE Judge reputation"
-        description="Every judge that adjudicates on Verdict owns a non-transferable ERC-7857 NFT. Verdict counts, appeal losses, and reputation are on-chain and queryable."
+        description="Every judge that adjudicates on Verdict Layer owns a non-transferable ERC-7857 NFT. Verdict counts, appeal losses, and reputation are on-chain and queryable."
       />
       {!registry ? (
         <NotDeployed />

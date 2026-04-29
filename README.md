@@ -1,14 +1,14 @@
 <div align="center">
 
-# Verdict
+# Verdict Layer
 
-### Verifiable AI Assertion Layer on 0G
+### Verifiable AI decisions on 0G
 
 </div>
 
-Verdict is a single on-chain primitive that answers *"is this claim true?"* and
-hands back a TEE-attested AI verdict with cryptographically anchored reasoning.
-One contract surface covers dispute resolution, parametric insurance,
+Verdict Layer is a single on-chain primitive that answers *"is this claim true?"*
+and hands back a TEE-attested AI verdict with cryptographically anchored
+reasoning. One contract surface covers dispute resolution, parametric insurance,
 milestone approvals, and authenticity checks — four reference apps sharing the
 same adjudication layer.
 

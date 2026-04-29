@@ -50,7 +50,7 @@ export function MarketingHeader() {
           <Link href="/" className="flex items-center gap-3">
             <VerdictLogo className="text-white" />
             <span className="text-xl font-semibold tracking-tight text-white">
-              Verdict
+              Verdict Layer
             </span>
           </Link>
         </div>
@@ -126,7 +126,7 @@ function MarketingMobileNav() {
           <div className="mb-8 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
               <VerdictLogo className="text-white" />
-              <span className="text-base font-semibold tracking-tight">Verdict</span>
+              <span className="text-base font-semibold tracking-tight">Verdict Layer</span>
             </Link>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close menu">

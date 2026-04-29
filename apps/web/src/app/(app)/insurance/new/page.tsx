@@ -42,7 +42,7 @@ export default function NewPolicyPage() {
       <PageHeader
         eyebrow="Insurance · Underwrite"
         title="Underwrite a policy"
-        description="Lock the payout in the vault as native 0G. The holder can file a claim any time during the coverage window; Verdict settles instantly on a valid trigger."
+        description="Lock the payout in the vault as native 0G. The holder can file a claim any time during the coverage window; Verdict Layer settles instantly on a valid trigger."
         action={
           <Button variant="ghost" asChild>
             <Link href="/insurance">Cancel</Link>

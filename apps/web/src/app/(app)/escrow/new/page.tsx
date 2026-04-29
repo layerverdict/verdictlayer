@@ -43,7 +43,7 @@ export default function NewEscrowPage() {
           <CardHeader>
             <CardTitle>Contracts not deployed on this chain</CardTitle>
             <CardDescription>
-              Switch to a chain where Verdict is live, or run the deploy script
+              Switch to a chain where Verdict Layer is live, or run the deploy script
               and publish the address to <code className="font-mono text-white/70">NEXT_PUBLIC_ESCROW</code>.
             </CardDescription>
           </CardHeader>

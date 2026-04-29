@@ -7,7 +7,7 @@ export default function ArchitecturePage() {
       <PageHeader
         eyebrow="Protocol"
         title="Architecture"
-        description="Verdict splits into four on-chain contracts and three off-chain services. The registry is the source of truth; everything else is pluggable."
+        description="Verdict Layer splits into four on-chain contracts and three off-chain services. The registry is the source of truth; everything else is pluggable."
       />
       <div className="mt-10 grid gap-6 md:grid-cols-2">
         <Card>
@@ -18,7 +18,7 @@ export default function ArchitecturePage() {
           <CardContent className="text-sm text-white/60">
             Every assertion has a claim, evidence roots, bond, callback, and
             mode. Implements <code className="font-mono text-white/80">IArbitrator</code>{" "}
-            so any ERC-792 dApp can swap in Verdict without touching its
+            so any ERC-792 dApp can swap in Verdict Layer without touching its
             application layer.
           </CardContent>
         </Card>

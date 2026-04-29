@@ -12,9 +12,9 @@ function HeroSection() {
           <HeroHeading />
 
           <p className="max-w-lg text-xl font-light leading-relaxed text-white/60">
-            A verifiable AI assertion layer on 0G. TEE-attested judges read your
-            evidence, reason in the open, and publish a signed verdict on-chain
-            in seconds.
+            Verdict Layer is a verifiable AI decision layer on 0G. TEE-attested judges
+            read your evidence, reason in the open, and publish a signed verdict
+            on-chain in seconds.
           </p>
 
           <div className="flex flex-col items-start gap-4 pt-4 sm:flex-row sm:items-center">
@@ -256,7 +256,7 @@ function FeaturesSection() {
             <br /> one assertion primitive.
           </h2>
           <p className="text-lg font-light text-white/50">
-            Verdict layers 0G Compute, Storage, and Chain into a single on-chain
+            Verdict Layer stitches 0G Compute, Storage, and Chain into a single on-chain
             resource. Judges inherit the guarantees of the TEE they run in; every
             outcome is cryptographically traceable from evidence to payout.
           </p>
@@ -298,7 +298,7 @@ function FeaturesSection() {
 
           <FeatureCard
             title="ERC-792 Compatible"
-            description="AssertionRegistry implements the ERC-792 arbitrator interface. Kleros-integrated dApps can swap Verdict in without touching their application layer."
+            description="AssertionRegistry implements the ERC-792 arbitrator interface. Kleros-integrated dApps can swap Verdict Layer in without touching their application layer."
           >
             <div className="relative z-10 w-full max-w-[220px] rounded-lg border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm transition-transform duration-500 group-hover:-translate-y-2">
               <div className="mb-3 flex gap-1.5">
@@ -419,7 +419,7 @@ function UseCasesSection() {
             Four apps. <br /> One primitive.
           </h2>
           <p className="text-lg font-light text-white/50">
-            Every app on Verdict is a thin layer on top of the same{" "}
+            Every app on Verdict Layer is a thin shell over the same{" "}
             <span className="font-mono text-white/70">AssertionRegistry</span>.
             Change the claim template, keep the guarantees.
           </p>

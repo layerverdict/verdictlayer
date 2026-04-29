@@ -10,11 +10,11 @@ export function MarketingFooter() {
           <div className="flex items-center gap-3">
             <VerdictLogo className="text-white" />
             <span className="text-lg font-bold tracking-tight text-white">
-              Verdict
+              Verdict Layer
             </span>
           </div>
           <p className="font-light leading-relaxed text-white/40">
-            The verifiable AI assertion layer. TEE-attested judges. On-chain
+            The verifiable AI decision layer. TEE-attested judges. On-chain
             enforcement. Every verdict cryptographically auditable. Built on 0G.
           </p>
         </div>
@@ -128,7 +128,7 @@ export function MarketingFooter() {
         </div>
       </div>
       <div className="mx-auto mt-20 flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-white/30 md:flex-row">
-        <p>&copy; {new Date().getFullYear()} Verdict. Built for the 0G APAC Hackathon 2026.</p>
+        <p>&copy; {new Date().getFullYear()} Verdict Layer. Built for the 0G APAC Hackathon 2026.</p>
         <div className="flex gap-6">
           <a
             href="https://chainscan.0g.ai"
