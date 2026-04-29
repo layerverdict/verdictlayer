@@ -7,20 +7,6 @@
 
 import type { Chain } from "viem";
 
-export const zgTestnet = {
-  id: 16602,
-  name: "0G Galileo Testnet",
-  nativeCurrency: { name: "0G", symbol: "0G", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://evmrpc-testnet.0g.ai"] },
-    public: { http: ["https://evmrpc-testnet.0g.ai"] },
-  },
-  blockExplorers: {
-    default: { name: "0G Galileo Scan", url: "https://chainscan-galileo.0g.ai" },
-  },
-  testnet: true,
-} as const satisfies Chain;
-
 export const zgMainnet = {
   id: 16661,
   name: "0G Mainnet",
@@ -34,11 +20,10 @@ export const zgMainnet = {
   },
 } as const satisfies Chain;
 
-export const supportedChains = [zgMainnet, zgTestnet] as const;
+export const supportedChains = [zgMainnet] as const;
 
 export function chainFor(chainId: number): Chain {
   if (chainId === zgMainnet.id) return zgMainnet;
-  if (chainId === zgTestnet.id) return zgTestnet;
   throw new Error(`unsupported chainId: ${chainId}`);
 }
 

@@ -1,0 +1,25 @@
+{
+  "chainId": 16661,
+  "network": "ogMainnet",
+  "deployedAt": "2026-04-29T18:52:24.015Z",
+  "deployer": "0x32Ef480f66feFDC0fd42D086117d4Bdf90c2e3C3",
+  "judgeRelayer": "0x32Ef480f66feFDC0fd42D086117d4Bdf90c2e3C3",
+  "feeSink": "0x32Ef480f66feFDC0fd42D086117d4Bdf90c2e3C3",
+  "bonds": {
+    "escrow": "50000000000000000",
+    "insurance": "10000000000000000",
+    "milestoneVault": "10000000000000000",
+    "authenticity": "5000000000000000"
+  },
+  "contracts": {
+    "verifier": "0x74A25B263c47bE53081274dB037a8182BD9eC90e",
+    "reputationRegistry": "0x9E82afb28b87957AFe50464A5717b5B53E395D0D",
+    "assertionRegistry": "0x2a5766F112666B52d2D7E2280dBa76CC3FC6d135",
+    "verdictEnforcer": "0x8ec138B556A2c0324146e259d9eBEA38A9575cA0",
+    "escalationManager": "0x7A2C325dD3047268dcaF996178603B272947821b",
+    "escrow": "0x2AF5CE88beFd4Cf8394a3EA967425212960b0A8B",
+    "parametricInsurance": "0x86ddD4AF766Ca394f303082A87089A510f8cD46B",
+    "milestoneVault": "0x2e5c75c560D4877899a49206c629d04b58faD51A",
+    "authenticityCertifier": "0xF388E071bD758261980d585359Ce2BA0024A8D46"
+  }
+}

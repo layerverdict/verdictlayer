@@ -5,7 +5,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { PrivyAuthContext } from "@/lib/auth";
 import { truncateAddress } from "@/lib/format";
-import { zgMainnet, zgTestnet } from "@/lib/web3/chains";
+import { zgMainnet } from "@/lib/web3/chains";
 
 /**
  * Isolated Privy provider module.
@@ -43,8 +43,8 @@ export function PrivyLayer({
             createOnLogin: "users-without-wallets",
           },
         },
-        defaultChain: zgTestnet,
-        supportedChains: [zgTestnet, zgMainnet],
+        defaultChain: zgMainnet,
+        supportedChains: [zgMainnet],
       }}
     >
       <PrivyBridge>{children}</PrivyBridge>

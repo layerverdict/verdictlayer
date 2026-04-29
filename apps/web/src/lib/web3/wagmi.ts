@@ -11,7 +11,7 @@ import { createConfig } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { fallback, http } from "viem";
 
-import { supportedChains, zgMainnet, zgTestnet } from "./chains";
+import { supportedChains, zgMainnet } from "./chains";
 
 export const wagmiConfig = createConfig({
   chains: supportedChains,
@@ -20,10 +20,6 @@ export const wagmiConfig = createConfig({
     [zgMainnet.id]: fallback([
       http(zgMainnet.rpcUrls.default.http[0], { retryCount: 2, retryDelay: 200 }),
       http(zgMainnet.rpcUrls.public.http[0]),
-    ]),
-    [zgTestnet.id]: fallback([
-      http(zgTestnet.rpcUrls.default.http[0], { retryCount: 2, retryDelay: 200 }),
-      http(zgTestnet.rpcUrls.public.http[0]),
     ]),
   },
   ssr: true,

@@ -19,7 +19,6 @@ import {
   explorerAddress,
   supportedChains,
   zgMainnet,
-  zgTestnet,
 } from "@/lib/web3/chains";
 import { cn } from "@/lib/utils";
 
@@ -79,7 +78,7 @@ export function LoginButton({ compact = false }: { compact?: boolean }) {
 
   const address = privy?.address ?? wagmiAddress;
   const label = privy?.label ?? (address ? truncateAddress(address, 4) : "Wallet");
-  const explorerChainId = chainId || zgTestnet.id;
+  const explorerChainId = chainId || zgMainnet.id;
 
   async function copyAddress() {
     if (!address) return;

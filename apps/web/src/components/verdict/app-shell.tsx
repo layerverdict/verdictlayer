@@ -9,13 +9,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { LoginButton } from "./login-button";
 import { VerdictLogo } from "./logo";
-import { zgMainnet } from "@/lib/web3/chains";
 import { cn } from "@/lib/utils";
 
-const CONFIGURED_CHAIN_ID = Number(
-  process.env.NEXT_PUBLIC_CHAIN_ID ?? zgMainnet.id,
-);
-const NETWORK_LABEL = CONFIGURED_CHAIN_ID === zgMainnet.id ? "Mainnet" : "Testnet";
+const NETWORK_LABEL = "Mainnet";
 
 type NavIconName =
   | "dashboard"

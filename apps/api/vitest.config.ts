@@ -7,7 +7,7 @@ export default defineConfig({
     // Integration tests are opt-in via RUN_INTEGRATION=1.
     env: {
       NODE_ENV: "test",
-      CHAIN_ID: "16602",
+      CHAIN_ID: "16661",
       RPC_URL: "http://localhost:0",
       STORAGE_INDEXER: "http://localhost:0",
       PRIVATE_KEY: "0x" + "a".repeat(64),

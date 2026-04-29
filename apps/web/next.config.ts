@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@verdict/shared"],
   typedRoutes: false,
   env: {
-    NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID ?? "16602",
+    NEXT_PUBLIC_CHAIN_ID: process.env.NEXT_PUBLIC_CHAIN_ID ?? "16661",
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000",
   },
 };

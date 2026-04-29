@@ -14,7 +14,7 @@ reasoning. One contract surface covers dispute resolution, parametric insurance,
 milestone approvals, and authenticity checks — four reference apps sharing the
 same adjudication layer.
 
-**Live on 0G Galileo testnet:** <https://verdictlayer.xyz>
+**Live on 0G Mainnet:** <https://verdictlayer.xyz>
 
 ---
 
@@ -31,7 +31,7 @@ same adjudication layer.
 ## Architecture
 
 ```
-0G Galileo Testnet (chainId 16602)
+0G Mainnet (chainId 16661)
 ├── AssertionRegistry · VerdictEnforcer · EscalationManager
 ├── ReputationRegistry (ERC-7857 soulbound judge NFT)
 └── Escrow · ParametricInsurance · MilestoneVault · AuthenticityCertifier
@@ -95,7 +95,7 @@ pnpm turbo run typecheck # 4 workspaces pass
 # contracts — compile, test, deploy
 pnpm --filter @verdict/contracts compile
 pnpm --filter @verdict/contracts test
-pnpm --filter @verdict/contracts exec hardhat run scripts/deploy.ts --network ogTestnet
+pnpm --filter @verdict/contracts exec hardhat run scripts/deploy.ts --network ogMainnet
 
 # api — dev (hot reload) / tests
 pnpm --filter @verdict/api dev
@@ -117,7 +117,7 @@ pnpm --filter @verdict/api exec drizzle-kit migrate
 
 | Layer         | Where it's used                                                                                                               |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Chain**     | 9 contracts on Galileo (addresses below). ERC-792-style arbitration interface + ERC-7857 soulbound judge reputation NFT.      |
+| **Chain**     | 9 contracts on 0G Mainnet (addresses below). ERC-792-style arbitration interface + ERC-7857 soulbound judge reputation NFT.   |
 | **Compute**   | Judgment worker calls `broker.inference` against TEE-verified providers; every response goes through `processResponse()`.     |
 | **Storage**   | Evidence uploads + reasoning transcripts via `ZgFile` + `Indexer`. Every bytes32 `evidenceRoot` on-chain is a 0G merkle root. |
 | **Oracles**   | `/api/oracle/flight` calls AviationStack, canonicalises the payload, uploads to 0G Storage, returns the root for a claim.     |
@@ -125,21 +125,23 @@ pnpm --filter @verdict/api exec drizzle-kit migrate
 
 ---
 
-## Deployment (0G Galileo testnet · chainId 16602)
+## Deployment (0G Mainnet · chainId 16661)
 
-| Contract                | Address                                        |
-| ----------------------- | ---------------------------------------------- |
-| AssertionRegistry       | `0x8ec138B556A2c0324146e259d9eBEA38A9575cA0`   |
-| VerdictEnforcer         | `0x7A2C325dD3047268dcaF996178603B272947821b`   |
-| EscalationManager       | `0x2AF5CE88beFd4Cf8394a3EA967425212960b0A8B`   |
-| ReputationRegistry      | `0x2a5766F112666B52d2D7E2280dBa76CC3FC6d135`   |
-| Verifier                | `0x9E82afb28b87957AFe50464A5717b5B53E395D0D`   |
-| Escrow                  | `0x86ddD4AF766Ca394f303082A87089A510f8cD46B`   |
-| ParametricInsurance     | `0x2e5c75c560D4877899a49206c629d04b58faD51A`   |
-| MilestoneVault          | `0xF388E071bD758261980d585359Ce2BA0024A8D46`   |
-| AuthenticityCertifier   | `0x4745DE55e4037b87768AB63Be1F479E4361096c1`   |
+| Contract              | Address                                                                                                                 |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| AssertionRegistry     | [`0x2a5766F112666B52d2D7E2280dBa76CC3FC6d135`](https://chainscan.0g.ai/address/0x2a5766F112666B52d2D7E2280dBa76CC3FC6d135) |
+| VerdictEnforcer       | [`0x8ec138B556A2c0324146e259d9eBEA38A9575cA0`](https://chainscan.0g.ai/address/0x8ec138B556A2c0324146e259d9eBEA38A9575cA0) |
+| EscalationManager     | [`0x7A2C325dD3047268dcaF996178603B272947821b`](https://chainscan.0g.ai/address/0x7A2C325dD3047268dcaF996178603B272947821b) |
+| ReputationRegistry    | [`0x9E82afb28b87957AFe50464A5717b5B53E395D0D`](https://chainscan.0g.ai/address/0x9E82afb28b87957AFe50464A5717b5B53E395D0D) |
+| Verifier              | [`0x74A25B263c47bE53081274dB037a8182BD9eC90e`](https://chainscan.0g.ai/address/0x74A25B263c47bE53081274dB037a8182BD9eC90e) |
+| Escrow                | [`0x2AF5CE88beFd4Cf8394a3EA967425212960b0A8B`](https://chainscan.0g.ai/address/0x2AF5CE88beFd4Cf8394a3EA967425212960b0A8B) |
+| ParametricInsurance   | [`0x86ddD4AF766Ca394f303082A87089A510f8cD46B`](https://chainscan.0g.ai/address/0x86ddD4AF766Ca394f303082A87089A510f8cD46B) |
+| MilestoneVault        | [`0x2e5c75c560D4877899a49206c629d04b58faD51A`](https://chainscan.0g.ai/address/0x2e5c75c560D4877899a49206c629d04b58faD51A) |
+| AuthenticityCertifier | [`0xF388E071bD758261980d585359Ce2BA0024A8D46`](https://chainscan.0g.ai/address/0xF388E071bD758261980d585359Ce2BA0024A8D46) |
 
-Explorer: <https://chainscan-galileo.0g.ai>
+Deployer / judge relayer / fee sink: [`0x32Ef480f66feFDC0fd42D086117d4Bdf90c2e3C3`](https://chainscan.0g.ai/address/0x32Ef480f66feFDC0fd42D086117d4Bdf90c2e3C3).
+
+Explorer: <https://chainscan.0g.ai>
 
 ---
 

@@ -138,14 +138,6 @@ export function MarketingFooter() {
           >
             0G Mainnet
           </a>
-          <a
-            href="https://chainscan-galileo.0g.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="transition-colors hover:text-white"
-          >
-            Galileo Testnet
-          </a>
         </div>
       </div>
     </footer>
