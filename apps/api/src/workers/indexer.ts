@@ -209,7 +209,7 @@ async function handleRegistryEvent(e: ethers.EventLog | ethers.Log) {
       await getJudgmentQueue().add(
         "judge",
         { assertionId: id as `0x${string}` },
-        { jobId: `judge:${id}` },
+        { jobId: `judge-${(id as string).slice(2)}` },
       );
       logger.info(
         { assertionId: id, evidenceRootCount: (evidenceRoots as string[]).length },
@@ -268,7 +268,7 @@ async function handleRegistryEvent(e: ethers.EventLog | ethers.Log) {
       await getAppealQueue().add(
         "appeal",
         { assertionId: id as `0x${string}` },
-        { jobId: `appeal:${id}` },
+        { jobId: `appeal-${(id as string).slice(2)}` },
       );
       logger.info({ assertionId: id }, "indexed AssertionChallenged → enqueued appeal");
       break;

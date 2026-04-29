@@ -67,7 +67,7 @@ export const assertionRoutes: FastifyPluginAsync = async (app) => {
       const job = await getJudgmentQueue().add(
         "judge",
         { assertionId: id },
-        { jobId: `judge:${id}` },
+        { jobId: `judge-${id.slice(2)}` },
       );
       return reply.code(202).send({ jobId: job.id });
     },
