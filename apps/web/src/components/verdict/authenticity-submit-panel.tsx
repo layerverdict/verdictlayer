@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { type Address, decodeEventLog } from "viem";
-import { usePrivy } from "@privy-io/react-auth";
 import {
   useAccount,
   useChainId,
@@ -12,6 +11,7 @@ import {
   useWriteContract,
 } from "wagmi";
 
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -63,7 +63,7 @@ function SignedOut() {
 }
 
 function SignInPrompt() {
-  const { login } = usePrivy();
+  const { login } = useAuth();
   return (
     <Card>
       <CardHeader>
