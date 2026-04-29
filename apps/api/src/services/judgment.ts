@@ -7,7 +7,8 @@
  *      materialised into the prompt; binary evidence is referenced by
  *      hash with a mime/size note).
  *   3. Build the system + user prompt.
- *   4. Pick a TEE chatbot provider (defaults to a GLM-5 hint).
+ *   4. Pick a TEE chatbot provider (JUDGE_PROVIDER env, otherwise
+ *      substring-hint match via pickTeeChatbot).
  *   5. Stream the completion through `runInference` — tokens land on
  *      the event bus for the SSE route.
  *   6. Parse the trailing JSON decision block.
@@ -27,7 +28,7 @@ import { eventBus } from "../lib/events.js";
 import { db, schema } from "../db/client.js";
 import { getContracts } from "../lib/chain.js";
 import { uploadBuffer } from "./storage.js";
-import { pickTeeChatbot, type DiscoveredService } from "./compute.js";
+import { pickByAddress, pickTeeChatbot, type DiscoveredService } from "./compute.js";
 import { runInference } from "./inference.js";
 import { listEvidenceByAssertion } from "./evidence.js";
 import { getAssertion, updateOutcome } from "./assertion.js";
@@ -95,7 +96,10 @@ export async function judge(input: JudgeInput): Promise<JudgeOutput> {
 
     publish("status", { phase: "inference" });
     const service =
-      input.service ?? (await pickTeeChatbot(input.modelHint ?? "glm"));
+      input.service ??
+      (config.JUDGE_PROVIDER
+        ? await pickByAddress(config.JUDGE_PROVIDER)
+        : await pickTeeChatbot(input.modelHint ?? config.JUDGE_MODEL_HINT));
 
     const inference = await runInference({
       service,

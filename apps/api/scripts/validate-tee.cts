@@ -23,7 +23,7 @@
  * Env (.env at repo root OR apps/api/.env):
  *   RPC_URL=https://evmrpc-testnet.0g.ai
  *   PRIVATE_KEY=0x...            # funded testnet key
- *   (optional) TEE_MODEL=glm     # substring match against service model
+ *   (optional) TEE_MODEL=deepseek   # substring match against service model
  */
 
 import { resolve } from "node:path";
@@ -80,7 +80,7 @@ function formatTuple(s: ServiceTuple) {
 async function main() {
   const RPC_URL = required("RPC_URL");
   const PRIVATE_KEY = required("PRIVATE_KEY");
-  const TEE_MODEL_HINT = (process.env.TEE_MODEL ?? "glm").toLowerCase();
+  const TEE_MODEL_HINT = (process.env.TEE_MODEL ?? "deepseek").toLowerCase();
 
   const started = Date.now();
   console.log("=".repeat(64));
@@ -296,7 +296,7 @@ async function main() {
   console.log(`inference:     ${latencyMs} ms`);
   console.log(`total gate:    ${total} ms`);
   console.log(`\nadd to .env for subsequent runs:`);
-  console.log(`GLM5_PROVIDER=${providerAddress}`);
+  console.log(`JUDGE_PROVIDER=${providerAddress}`);
 }
 
 main().catch((err) => {

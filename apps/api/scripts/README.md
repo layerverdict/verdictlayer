@@ -49,14 +49,34 @@ step 3 (ledger create) are valid smoke tests.
 > settled` block into the submission notes. The gate is deliberately
 > idempotent so it can be replayed on demand.
 
-### Current testnet provider catalogue
+### Current provider catalogue
 
-Discovered on chain 16602 via `listService()`. Cache these in `.env`
-so the protocol stack doesn't need to hit the broker on every boot.
+Discovered via `listService()`. Cache in `.env` so the protocol stack
+doesn't need to hit the broker on every boot. Prices are 0G per 1M
+tokens unless noted.
 
-| Provider | Service | Model | Verifiability |
-| --- | --- | --- | --- |
-| `0xa48f01287233509FD694a22Bf840225062E67836` | chatbot | qwen/qwen-2.5-7b-instruct | TeeML |
-| `0x4b2a941929E39Adbea5316dDF2B9Bd8Ff3134389` | image-editing | qwen/qwen-image-edit-2511 | TeeML |
+**Mainnet (chainId 16661)**
+
+| Provider | Service | Model | In | Out |
+| --- | --- | --- | --- | --- |
+| `0xd9966e13a6026Fcca4b13E7ff95c94DE268C471C` | chatbot | zai-org/GLM-5-FP8 | 0.720 | 4.200 |
+| `0x7DCFe6AEa70350C2090041524c9B4A9262DCe87D` | chatbot | zai-org/GLM-5.1-FP8 | 0.934 | 7.800 |
+| `0x1B3AAef3ae5050EEE04ea38cD4B087472BD85EB0` | chatbot | deepseek/deepseek-chat-v3-0324 | 0.910 | 2.736 |
+| `0x4415ef5CBb415347bb18493af7cE01f225Fc0868` | chatbot | qwen/qwen3-vl-30b-a3b-instruct | 0.400 | 2.400 |
+| `0x992e6396157Dc4f22E74F2231235D7DE62696db5` | chatbot | qwen3.6-plus | 0.800 | 4.800 |
+| `0x25F8f01cA76060ea40895472b1b79f76613Ca497` | chatbot | openai/gpt-5.4-mini | 1.600 | 9.000 |
+| `0x36aCffCEa3CCe07cAdd1740Ad992dB16Ab324517` | stt | openai/whisper-large-v3 | — | — |
+| `0xE29a72c7629815Eb480aE5b1F2dfA06f06cdF974` | t2i | z-image | — | 0.003 / image |
+
+**Testnet (chainId 16602)**
+
+| Provider | Service | Model | In | Out |
+| --- | --- | --- | --- | --- |
+| `0xa48f01287233509FD694a22Bf840225062E67836` | chatbot | qwen/qwen-2.5-7b-instruct | 0.050 | 0.100 |
+| `0x4b2a941929E39Adbea5316dDF2B9Bd8Ff3134389` | image-editing | qwen/qwen-image-edit-2511 | — | 0.005 / image |
+
+**Verdict Layer defaults (mainnet):**
+- `JUDGE_PROVIDER = DeepSeek V3` — cheapest dense-reasoning chatbot, narrative-safe default.
+- `SWARM_PROVIDERS = DeepSeek V3, GLM-5-FP8, Qwen3-VL 30B` — three independent model families.
 
 0G Compute inference contract (testnet): `0xE70830508dAc0A97e6c087c75f402f9Be669E406`

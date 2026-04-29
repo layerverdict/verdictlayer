@@ -2,8 +2,9 @@
  * Multi-Agent appeal swarm.
  *
  * On an AUDITED assertion challenge, the backend:
- *   1. Selects 3 distinct TEE chatbot providers (model hints:
- *      glm / deepseek / qwen3).
+ *   1. Selects 3 distinct TEE chatbot providers. When SWARM_PROVIDERS
+ *      env is set it pins exactly those addresses (in order); otherwise
+ *      the first 3 TEE chatbots returned by listService() are used.
  *   2. Runs `judge`-style inference in parallel against each, using the
  *      same structured prompt as the first-instance judge.
  *   3. Uploads each reasoning transcript to 0G Storage.
@@ -98,7 +99,10 @@ export async function runAppealSwarm(input: AppealInput): Promise<AppealResult> 
   ];
 
   publish("status", { phase: "appeal-discovery" });
-  const services = await pickTeeChatbotSwarm(3);
+  const preferred = config.SWARM_PROVIDERS?.split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  const services = await pickTeeChatbotSwarm(3, preferred);
   if (services.length < 3) {
     throw new Error(`appeal swarm requires 3 distinct providers; found ${services.length}`);
   }

@@ -15,11 +15,22 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
 
-  QWEN_CHAT_PROVIDER: z.string().optional(),
-  QWEN_IMAGE_PROVIDER: z.string().optional(),
-  GLM5_PROVIDER: z.string().optional(),
-  DEEPSEEK_PROVIDER: z.string().optional(),
-  QWEN3_PROVIDER: z.string().optional(),
+  /**
+   * Primary TEE chatbot provider. If unset, the judgment service falls
+   * back to substring matching via `pickTeeChatbot(JUDGE_MODEL_HINT)`.
+   * On mainnet (chainId 16661) this should be pinned to the DeepSeek V3
+   * provider — it's the cheapest dense-reasoning chatbot (0.91 in /
+   * 2.74 out per 1M tokens) and the narrative-safe default.
+   */
+  JUDGE_PROVIDER: z.string().optional(),
+  /** Substring hint for pickTeeChatbot when JUDGE_PROVIDER is unset. */
+  JUDGE_MODEL_HINT: z.string().default("deepseek"),
+  /**
+   * Appeal-swarm providers as a comma-separated address list. When set,
+   * the appeal service uses these instead of the first-3-discovered
+   * default. Order matters: it becomes the swarm presentation order.
+   */
+  SWARM_PROVIDERS: z.string().optional(),
   OG_INFERENCE_CONTRACT: z.string().optional(),
 
   /** Panel judge tokenIds for the appeal swarm, comma-separated. */

@@ -38,7 +38,7 @@ same adjudication layer.
         ↓
 Fastify API + chain indexer + judgment/appeal workers (BullMQ)
         ↓
-0G Compute TEE (Sealed Inference, GLM-5 / DeepSeek / Qwen3)
+0G Compute TEE (Sealed Inference — DeepSeek V3 (primary) + GLM-5-FP8 + Qwen3-VL 30B swarm)
 0G Storage (evidence + reasoning root hashes)
 ```
 

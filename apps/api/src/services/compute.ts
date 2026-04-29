@@ -143,17 +143,52 @@ export async function pickTeeChatbot(modelHint: string): Promise<DiscoveredServi
 }
 
 /**
+ * Resolve a specific provider address to a DiscoveredService. Throws if
+ * the address isn't currently in listService() (provider offline, wrong
+ * chain, etc.) — fail loud so operators fix the env, not silently fall
+ * back to a random chatbot.
+ */
+export async function pickByAddress(address: string): Promise<DiscoveredService> {
+  const services = await listServices();
+  const match = services.find(
+    (s) => s[0].toLowerCase() === address.toLowerCase(),
+  );
+  if (!match) {
+    throw new Error(
+      `provider ${address} not found in current listService() response — check network/provider status`,
+    );
+  }
+  return {
+    providerAddress: match[0],
+    serviceType: match[1],
+    endpoint: match[2],
+    model: match[6],
+    verifiability: match[7],
+    teeVerified: match[10],
+  };
+}
+
+/**
  * Pick N distinct TEE chatbot providers for a multi-agent swarm.
  * De-dupes by providerAddress; returns up to `count` distinct entries.
+ * When `preferredAddresses` is supplied, those addresses (if present in
+ * listService()) are placed first and in order.
  */
-export async function pickTeeChatbotSwarm(count: number): Promise<DiscoveredService[]> {
+export async function pickTeeChatbotSwarm(
+  count: number,
+  preferredAddresses?: string[],
+): Promise<DiscoveredService[]> {
   const services = await listServices();
   const chatbots = services.filter((s) => s[1] === "chatbot" && s[10] === true);
 
+  const byAddress = new Map<string, (typeof chatbots)[number]>();
+  for (const s of chatbots) byAddress.set(s[0].toLowerCase(), s);
+
   const seen = new Set<string>();
   const picks: DiscoveredService[] = [];
-  for (const s of chatbots) {
-    if (seen.has(s[0])) continue;
+
+  const push = (s: (typeof chatbots)[number]) => {
+    if (seen.has(s[0])) return;
     seen.add(s[0]);
     picks.push({
       providerAddress: s[0],
@@ -163,7 +198,21 @@ export async function pickTeeChatbotSwarm(count: number): Promise<DiscoveredServ
       verifiability: s[7],
       teeVerified: s[10],
     });
+  };
+
+  // Preferred addresses first, in order.
+  if (preferredAddresses) {
+    for (const addr of preferredAddresses) {
+      const match = byAddress.get(addr.toLowerCase());
+      if (match) push(match);
+      if (picks.length === count) break;
+    }
+  }
+
+  // Fill remaining slots with any discovered chatbots.
+  for (const s of chatbots) {
     if (picks.length === count) break;
+    push(s);
   }
 
   if (picks.length === 0) {

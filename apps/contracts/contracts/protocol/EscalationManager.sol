@@ -27,7 +27,9 @@ contract EscalationManager is AccessControl, IVerdictTypes {
     bytes32 public constant PANEL_ROLE = keccak256("PANEL_ROLE");
 
     /// @notice Number of votes required to close an appeal. Fixed at 3 for
-    ///         v1 (GLM-5, DeepSeek v3, Qwen3-VL). Odd to avoid ties.
+    ///         v1. Default swarm: DeepSeek V3, GLM-5-FP8, Qwen3-VL 30B —
+    ///         three distinct model families on TEE-verified 0G Compute
+    ///         providers. Odd to avoid ties.
     uint8 public constant PANEL_SIZE = 3;
 
     AssertionRegistry public immutable registry;

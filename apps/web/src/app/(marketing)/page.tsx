@@ -359,7 +359,7 @@ function FeaturesSection() {
 
           <FeatureCard
             title="Appeal Swarm"
-            description="AUDITED assertions can be challenged during a bond-backed window. Three distinct models (GLM-5, DeepSeek v3, Qwen3) vote in parallel; the majority wins."
+            description="AUDITED assertions can be challenged during a bond-backed window. Three independent TEE-verified models on 0G Compute — DeepSeek V3, GLM-5-FP8, Qwen3-VL 30B — vote in parallel; the majority wins."
           >
             <svg width="200" height="120" viewBox="0 0 200 120" className="relative z-10 transition-transform duration-700 group-hover:rotate-1" aria-hidden="true">
               <circle cx="50" cy="60" r="18" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.2" />

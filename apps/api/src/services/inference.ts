@@ -50,7 +50,7 @@ export interface RunInferenceInput {
   assertionId?: `0x${string}`; // for SSE streaming — optional for ad-hoc calls
   temperature?: number;
   /** Upper bound on the whole request, start-of-stream to finish.
-   *  Default 90s — long enough for GLM-5 on a busy provider, short
+   *  Default 90s — long enough for a busy TEE chatbot provider, short
    *  enough to stay inside the BullMQ lockDuration (120s). */
   timeoutMs?: number;
 }
@@ -216,10 +216,5 @@ export async function runInference(input: RunInferenceInput): Promise<InferenceR
 
 /** Small helper to identify the default judge provider from env, if any. */
 export function configuredJudgeProvider(): string | undefined {
-  return (
-    config.GLM5_PROVIDER ??
-    config.QWEN_CHAT_PROVIDER ??
-    config.DEEPSEEK_PROVIDER ??
-    config.QWEN3_PROVIDER
-  );
+  return config.JUDGE_PROVIDER;
 }
