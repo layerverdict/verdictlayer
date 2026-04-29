@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { upload, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { explorerTx, zgMainnet } from "@/lib/web3/chains";
+import { truncateHash } from "@/lib/format";
 
 type UploadedEvidence = {
   rootHash: `0x${string}`;
@@ -102,12 +104,29 @@ export function EvidenceUploader({
     return (
       <div className="rounded-xl border border-green-400/30 bg-green-400/10 p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <div className="text-sm font-medium text-green-200">
               {uploaded.label}
             </div>
-            <div className="font-mono text-xs text-white/60">
-              {uploaded.rootHash}
+            <div className="space-y-0.5 text-[11px] leading-tight text-white/60">
+              <div className="font-mono break-all">
+                <span className="text-white/40">root&nbsp;</span>
+                {uploaded.rootHash}
+              </div>
+              {uploaded.txHash ? (
+                <div className="font-mono">
+                  <span className="text-white/40">tx&nbsp;&nbsp;&nbsp;&nbsp;</span>
+                  <a
+                    href={explorerTx(zgMainnet.id, uploaded.txHash)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline decoration-white/20 underline-offset-2 hover:text-white hover:decoration-white/60"
+                    title="View Flow.submit on 0G Chain Scan"
+                  >
+                    {truncateHash(uploaded.txHash, 10, 8)} ↗
+                  </a>
+                </div>
+              ) : null}
             </div>
           </div>
           <Button

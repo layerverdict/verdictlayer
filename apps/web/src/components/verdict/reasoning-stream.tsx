@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
 import { truncateHash } from "@/lib/format";
+import { explorerTx, zgMainnet } from "@/lib/web3/chains";
 
 type StreamEvent =
   | { kind: "status"; data: { status: string; message?: string } }
@@ -151,7 +152,7 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
             {"reasoningRoot" in outcome && outcome.reasoningRoot ? (
               <div>
                 Reasoning root
-                <div className="font-mono text-white/70">
+                <div className="font-mono text-white/70 break-all">
                   {truncateHash(outcome.reasoningRoot, 10, 8)}
                 </div>
               </div>
@@ -159,9 +160,15 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
             {"verdictTx" in outcome && outcome.verdictTx ? (
               <div>
                 Verdict TX
-                <div className="font-mono text-white/70">
-                  {truncateHash(outcome.verdictTx, 10, 8)}
-                </div>
+                <a
+                  href={explorerTx(zgMainnet.id, outcome.verdictTx)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-white/70 underline decoration-white/20 underline-offset-2 hover:text-white hover:decoration-white/60"
+                  title="View on 0G Chain Scan"
+                >
+                  {truncateHash(outcome.verdictTx, 10, 8)} ↗
+                </a>
               </div>
             ) : null}
           </div>
