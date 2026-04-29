@@ -26,7 +26,12 @@ import {
 } from "../lib/broker.js";
 import { getSigner } from "../lib/chain.js";
 
-const MIN_LEDGER_0G = 1.0;
+// Mainnet LedgerManager requires a 3.0 0G minimum initial deposit;
+// testnet accepted 1.0 but creating a ledger with < 3 0G reverts on
+// mainnet with `InsufficientDeposit(provided, required)`
+// (selector 0x54443ec4). Keep the floor at the higher value so both
+// networks work with the same code path.
+const MIN_LEDGER_0G = 3.0;
 // Derived so the bigint and the float stay in lockstep — changing one
 // place is enough.
 const MIN_LEDGER_WEI = ethers.parseEther(MIN_LEDGER_0G.toString());
