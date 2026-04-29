@@ -34,3 +34,16 @@ export function decodeCheckStatus(raw: number | bigint): CheckStatus {
   if (n >= 0 && n <= 3) return n as CheckStatus;
   return 0;
 }
+
+export function decodeCheckStatusLabel(label: string): CheckStatus {
+  switch (label) {
+    case "PENDING":
+      return CHECK_STATUS.PENDING;
+    case "CERTIFIED":
+      return CHECK_STATUS.CERTIFIED;
+    case "REJECTED":
+      return CHECK_STATUS.REJECTED;
+    default:
+      return CHECK_STATUS.NONE;
+  }
+}

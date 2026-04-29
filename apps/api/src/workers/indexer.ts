@@ -29,7 +29,13 @@ const POLL_MS = 3_000;
 const BLOCK_CONFIRMATIONS = 2; // only index events this many blocks deep
 const MAX_RANGE = 2_000;
 
-type ContractKey = "assertionRegistry" | "escalationManager";
+type ContractKey =
+  | "assertionRegistry"
+  | "escalationManager"
+  | "escrow"
+  | "parametricInsurance"
+  | "milestoneVault"
+  | "authenticityCertifier";
 
 async function getCheckpoint(contract: ContractKey): Promise<number> {
   const rows = await db
@@ -59,6 +65,19 @@ export async function runIndexerOnce() {
   await Promise.all([
     indexContract(contracts.assertionRegistry, "assertionRegistry", safeTip, handleRegistryEvent),
     indexContract(contracts.escalationManager, "escalationManager", safeTip, handleEscalationEvent),
+    indexContract(contracts.escrow, "escrow", safeTip, (e) => handleEscrowEvent(e, contracts.escrow)),
+    indexContract(
+      contracts.parametricInsurance,
+      "parametricInsurance",
+      safeTip,
+      (e) => handlePolicyEvent(e, contracts.parametricInsurance),
+    ),
+    indexContract(contracts.milestoneVault, "milestoneVault", safeTip, (e) =>
+      handleGrantEvent(e, contracts.milestoneVault),
+    ),
+    indexContract(contracts.authenticityCertifier, "authenticityCertifier", safeTip, (e) =>
+      handleCheckEvent(e, contracts.authenticityCertifier),
+    ),
   ]);
 
   // AUDITED verdicts need someone to flip them to RESOLVED once the
@@ -283,6 +302,377 @@ async function handleEscalationEvent(_e: ethers.EventLog | ethers.Log) {
   // v1: escalation events aren't mirrored — the `closeAppeal` handler
   // writes the final outcome via `AssertionResolved` on the registry,
   // which is already indexed above.
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Application mirrors — Escrow
+// ─────────────────────────────────────────────────────────────────────
+
+async function handleEscrowEvent(
+  e: ethers.EventLog | ethers.Log,
+  contract: ethers.Contract,
+) {
+  if (!("eventName" in e) || !e.eventName) return;
+  const evt = e as ethers.EventLog;
+
+  switch (evt.eventName) {
+    case "EscrowCreated": {
+      const [escrowId, client, freelancer, token, amount, deadline, scope] =
+        evt.args;
+      const id = Number(escrowId);
+      await db
+        .insert(schema.escrows)
+        .values({
+          id,
+          chainId: config.CHAIN_ID,
+          client: client as string,
+          freelancer: freelancer as string,
+          token: token as string,
+          amount: (amount as bigint).toString(),
+          deadline: new Date(Number(deadline) * 1000),
+          status: "FUNDED",
+          scope: scope as string,
+        })
+        .onConflictDoNothing();
+      logger.info({ escrowId: id }, "indexed EscrowCreated");
+      break;
+    }
+
+    case "DeliverySubmitted": {
+      const [escrowId, evidence] = evt.args;
+      await updateEscrow(Number(escrowId), {
+        status: "DELIVERED",
+        deliveryEvidence: evidence as string,
+      });
+      break;
+    }
+
+    case "Accepted": {
+      const [escrowId] = evt.args;
+      await updateEscrow(Number(escrowId), { status: "ACCEPTED" });
+      break;
+    }
+
+    case "DisputeOpened": {
+      const [escrowId, assertionId, clientEvidence] = evt.args;
+      // The contract sets a 24-hour response deadline on openDispute; we
+      // can read it back from the struct to keep the UI countdown honest.
+      let disputeResponseDeadline: Date | undefined;
+      try {
+        const struct = (await contract.getFunction("getEscrow")(
+          escrowId,
+        )) as { disputeResponseDeadline: bigint };
+        if (struct.disputeResponseDeadline > 0n) {
+          disputeResponseDeadline = new Date(
+            Number(struct.disputeResponseDeadline) * 1000,
+          );
+        }
+      } catch (err) {
+        logger.warn({ err, escrowId }, "escrow.getEscrow failed for DisputeOpened");
+      }
+      await updateEscrow(Number(escrowId), {
+        status: "DISPUTED",
+        assertionId: assertionId as string,
+        clientEvidence: clientEvidence as string,
+        disputeResponseDeadline,
+      });
+      break;
+    }
+
+    case "DisputeResponded": {
+      const [escrowId, freelancerEvidence] = evt.args;
+      await updateEscrow(Number(escrowId), {
+        freelancerEvidence: freelancerEvidence as string,
+      });
+      break;
+    }
+
+    case "ResolvedByVerdict": {
+      const [escrowId, , outcome] = evt.args;
+      const outcomeNum = Number(outcome);
+      // Outcome.TRUE (1) = client wins → RESOLVED_CLIENT
+      // Outcome.FALSE (2) = freelancer wins → RESOLVED_FREELANCER
+      // Outcome.INVALID (3) = callback resets to DELIVERED (per contract)
+      const status =
+        outcomeNum === 1
+          ? "RESOLVED_CLIENT"
+          : outcomeNum === 2
+            ? "RESOLVED_FREELANCER"
+            : "DELIVERED";
+      const patch: Partial<schema.NewEscrow> =
+        status === "DELIVERED"
+          ? {
+              status,
+              clientEvidence: null,
+              freelancerEvidence: null,
+              assertionId: null,
+              disputeResponseDeadline: null,
+            }
+          : { status };
+      await updateEscrow(Number(escrowId), patch);
+      break;
+    }
+
+    case "Expired": {
+      const [escrowId] = evt.args;
+      await updateEscrow(Number(escrowId), { status: "EXPIRED" });
+      break;
+    }
+  }
+}
+
+async function updateEscrow(id: number, patch: Partial<schema.NewEscrow>) {
+  await db
+    .update(schema.escrows)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.escrows.chainId, config.CHAIN_ID),
+        eq(schema.escrows.id, id),
+      ),
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Application mirrors — Parametric Insurance
+// ─────────────────────────────────────────────────────────────────────
+
+async function handlePolicyEvent(
+  e: ethers.EventLog | ethers.Log,
+  _contract: ethers.Contract,
+) {
+  if (!("eventName" in e) || !e.eventName) return;
+  const evt = e as ethers.EventLog;
+
+  switch (evt.eventName) {
+    case "PolicyCreated": {
+      const [
+        policyId,
+        insurer,
+        holder,
+        premium,
+        payout,
+        coverageStart,
+        coverageEnd,
+        condition,
+      ] = evt.args;
+      await db
+        .insert(schema.policies)
+        .values({
+          id: Number(policyId),
+          chainId: config.CHAIN_ID,
+          insurer: insurer as string,
+          holder: holder as string,
+          premium: (premium as bigint).toString(),
+          payout: (payout as bigint).toString(),
+          coverageStart: new Date(Number(coverageStart) * 1000),
+          coverageEnd: new Date(Number(coverageEnd) * 1000),
+          status: "ACTIVE",
+          condition: condition as string,
+        })
+        .onConflictDoNothing();
+      break;
+    }
+
+    case "ClaimOpened": {
+      const [policyId, assertionId, evidenceRoot] = evt.args;
+      await updatePolicy(Number(policyId), {
+        status: "CLAIM_PENDING",
+        assertionId: assertionId as string,
+        claimEvidence: evidenceRoot as string,
+      });
+      break;
+    }
+
+    case "ClaimPaid": {
+      const [policyId] = evt.args;
+      await updatePolicy(Number(policyId), { status: "PAID" });
+      break;
+    }
+
+    case "ClaimRejected": {
+      // Contract flips ACTIVE (the holder can refile within coverage).
+      // If this was an INVALID outcome the claim slot was reset too.
+      const [policyId] = evt.args;
+      await updatePolicy(Number(policyId), {
+        status: "ACTIVE",
+        assertionId: null,
+        claimEvidence: null,
+      });
+      break;
+    }
+
+    case "Expired": {
+      const [policyId] = evt.args;
+      await updatePolicy(Number(policyId), { status: "EXPIRED" });
+      break;
+    }
+  }
+}
+
+async function updatePolicy(id: number, patch: Partial<schema.NewPolicy>) {
+  await db
+    .update(schema.policies)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.policies.chainId, config.CHAIN_ID),
+        eq(schema.policies.id, id),
+      ),
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Application mirrors — Milestone Vault
+// ─────────────────────────────────────────────────────────────────────
+
+async function handleGrantEvent(
+  e: ethers.EventLog | ethers.Log,
+  _contract: ethers.Contract,
+) {
+  if (!("eventName" in e) || !e.eventName) return;
+  const evt = e as ethers.EventLog;
+
+  switch (evt.eventName) {
+    case "GrantCreated": {
+      const [
+        grantId,
+        dao,
+        grantee,
+        token,
+        totalAmount,
+        grantExpiresAt,
+        milestoneCount,
+      ] = evt.args;
+      await db
+        .insert(schema.grants)
+        .values({
+          id: Number(grantId),
+          chainId: config.CHAIN_ID,
+          dao: dao as string,
+          grantee: grantee as string,
+          token: token as string,
+          totalAmount: (totalAmount as bigint).toString(),
+          releasedAmount: "0",
+          milestoneCount: Number(milestoneCount),
+          milestonesReleased: 0,
+          grantExpiresAt: new Date(Number(grantExpiresAt) * 1000),
+        })
+        .onConflictDoNothing();
+      break;
+    }
+
+    case "MilestoneReleased": {
+      const [grantId, , amount] = evt.args;
+      // Accumulate released amount + milestone counter. SQL-side
+      // arithmetic avoids a read-modify-write race when two releases
+      // land in the same indexer tick.
+      await db
+        .update(schema.grants)
+        .set({
+          releasedAmount: sql`${schema.grants.releasedAmount} + ${(amount as bigint).toString()}`,
+          milestonesReleased: sql`${schema.grants.milestonesReleased} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.grants.chainId, config.CHAIN_ID),
+            eq(schema.grants.id, Number(grantId)),
+          ),
+        );
+      break;
+    }
+
+    case "GrantReclaimed": {
+      // The remainder of the grant was reclaimed by the DAO — treat it
+      // as "fully drained" by pinning releasedAmount to totalAmount.
+      const [grantId] = evt.args;
+      await db
+        .update(schema.grants)
+        .set({
+          releasedAmount: sql`${schema.grants.totalAmount}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.grants.chainId, config.CHAIN_ID),
+            eq(schema.grants.id, Number(grantId)),
+          ),
+        );
+      break;
+    }
+
+    // MilestoneSubmitted + MilestoneRejected don't change the grant
+    // aggregate; per-milestone state lives on-chain and we render it
+    // from the detail view reading getMilestone directly.
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Application mirrors — Authenticity
+// ─────────────────────────────────────────────────────────────────────
+
+async function handleCheckEvent(
+  e: ethers.EventLog | ethers.Log,
+  _contract: ethers.Contract,
+) {
+  if (!("eventName" in e) || !e.eventName) return;
+  const evt = e as ethers.EventLog;
+
+  switch (evt.eventName) {
+    case "CheckSubmitted": {
+      const [checkId, assetHash, referenceHash, submitter, assertionId] =
+        evt.args;
+      const block = await evt.getBlock();
+      await db
+        .insert(schema.authenticityChecks)
+        .values({
+          id: Number(checkId),
+          chainId: config.CHAIN_ID,
+          submitter: submitter as string,
+          assetHash: assetHash as string,
+          referenceHash: referenceHash as string,
+          status: "PENDING",
+          assertionId: assertionId as string,
+          submittedAt: new Date(block.timestamp * 1000),
+        })
+        .onConflictDoNothing();
+      break;
+    }
+
+    case "CertificateIssued": {
+      const [checkId, , reasoningRoot] = evt.args;
+      await db
+        .update(schema.authenticityChecks)
+        .set({
+          status: "CERTIFIED",
+          reasoningRoot: reasoningRoot as string,
+          decidedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(schema.authenticityChecks.chainId, config.CHAIN_ID),
+            eq(schema.authenticityChecks.id, Number(checkId)),
+          ),
+        );
+      break;
+    }
+
+    case "CheckRejected": {
+      const [checkId] = evt.args;
+      await db
+        .update(schema.authenticityChecks)
+        .set({ status: "REJECTED", decidedAt: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(schema.authenticityChecks.chainId, config.CHAIN_ID),
+            eq(schema.authenticityChecks.id, Number(checkId)),
+          ),
+        );
+      break;
+    }
+  }
 }
 
 function outcomeName(o: number): string {

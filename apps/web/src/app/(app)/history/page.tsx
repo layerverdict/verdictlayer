@@ -1,19 +1,18 @@
-"use client";
-
-import useSWR from "swr";
-import { useState } from "react";
+import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/verdict/empty-state";
-import { Stagger } from "@/components/verdict/motion";
 import { PageHeader } from "@/components/verdict/page-header";
 import { AssertionRowCard, type AssertionRow } from "@/components/verdict/assertion-row";
-import { fetcher } from "@/lib/api";
+import {
+  listAssertions,
+  type AssertionListRow,
+} from "@/lib/api-server";
 import { appSlugForCallback, type AppSlug } from "@/lib/web3/routing";
 import { cn } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 type Outcome = "ALL" | "PENDING" | "TRUE" | "FALSE" | "INVALID" | "ESCALATED";
 type AppFilter = "ALL" | AppSlug;
@@ -30,19 +29,46 @@ const APP_LABEL_FILTER: Record<AppFilter, string> = {
   unknown: "Unknown",
 };
 
-export default function HistoryPage() {
-  const [outcome, setOutcome] = useState<Outcome>("ALL");
-  const [app, setApp] = useState<AppFilter>("ALL");
+function parseOutcome(raw: string | undefined): Outcome {
+  return (OUTCOMES as string[]).includes(raw ?? "") ? (raw as Outcome) : "ALL";
+}
+function parseApp(raw: string | undefined): AppFilter {
+  return (APPS as string[]).includes(raw ?? "") ? (raw as AppFilter) : "ALL";
+}
 
-  const query = outcome === "ALL" ? "?limit=200" : `?limit=200&outcome=${outcome}`;
-  const { data, error, isLoading, mutate } = useSWR<{ assertions: AssertionRow[] }>(
-    `/api/assertions${query}`,
-    fetcher,
-  );
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ outcome?: string; app?: string }>;
+}) {
+  const sp = await searchParams;
+  const outcome = parseOutcome(sp.outcome);
+  const app = parseApp(sp.app);
 
-  const rows = (data?.assertions ?? []).filter(
+  let rows: AssertionListRow[] = [];
+  let error: string | null = null;
+  try {
+    const res = await listAssertions({
+      limit: 200,
+      outcome: outcome === "ALL" ? undefined : outcome,
+    });
+    rows = res.assertions;
+  } catch (err) {
+    error = (err as Error).message;
+  }
+
+  // App filter is a client-side JOIN on callback → app — cheap to do
+  // here since we've already got the list in memory.
+  const filtered = rows.filter(
     (row) => app === "ALL" || appSlugForCallback(row.callback) === app,
   );
+
+  const buildHref = (nextOutcome: Outcome, nextApp: AppFilter) => {
+    const params: string[] = [];
+    if (nextOutcome !== "ALL") params.push(`outcome=${nextOutcome}`);
+    if (nextApp !== "ALL") params.push(`app=${nextApp}`);
+    return params.length ? `/history?${params.join("&")}` : "/history";
+  };
 
   return (
     <div className="space-y-8">
@@ -50,11 +76,6 @@ export default function HistoryPage() {
         eyebrow="Protocol · History"
         title="Assertion history"
         description="Every assertion the indexer has mirrored, across the four applications. Filter by outcome or app."
-        action={
-          <Button variant="ghost" onClick={() => mutate()}>
-            Refresh
-          </Button>
-        }
       />
 
       <div className="flex flex-wrap gap-2">
@@ -63,10 +84,9 @@ export default function HistoryPage() {
             App
           </span>
           {APPS.map((a) => (
-            <button
+            <Link
               key={a}
-              type="button"
-              onClick={() => setApp(a)}
+              href={buildHref(outcome, a)}
               className={cn(
                 "rounded-lg px-3 py-1 text-xs font-medium transition-colors",
                 app === a
@@ -75,7 +95,7 @@ export default function HistoryPage() {
               )}
             >
               {APP_LABEL_FILTER[a]}
-            </button>
+            </Link>
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-1 rounded-xl border border-white/10 bg-white/[0.04] p-1">
@@ -83,10 +103,9 @@ export default function HistoryPage() {
             Outcome
           </span>
           {OUTCOMES.map((o) => (
-            <button
+            <Link
               key={o}
-              type="button"
-              onClick={() => setOutcome(o)}
+              href={buildHref(o, app)}
               className={cn(
                 "rounded-lg px-3 py-1 text-xs font-medium transition-colors",
                 outcome === o
@@ -95,7 +114,7 @@ export default function HistoryPage() {
               )}
             >
               {o}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -103,20 +122,11 @@ export default function HistoryPage() {
       {error ? (
         <Card>
           <CardHeader>
-            <CardTitle>Couldn&apos;t reach the API</CardTitle>
-            <CardDescription>
-              {(error as Error).message}. Check{" "}
-              <code className="font-mono text-white/70">NEXT_PUBLIC_API_URL</code>.
-            </CardDescription>
+            <CardTitle>Indexer catching up</CardTitle>
+            <CardDescription>{error}</CardDescription>
           </CardHeader>
         </Card>
-      ) : isLoading ? (
-        <div className="grid gap-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : rows.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <EmptyState
           title="No assertions match the filters"
           description="Try a wider outcome or switch to All apps."
@@ -124,17 +134,17 @@ export default function HistoryPage() {
       ) : (
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <Badge variant="secondary">{rows.length} results</Badge>
+            <Badge variant="secondary">{filtered.length} results</Badge>
             {outcome !== "ALL" ? <Badge variant="outline">{outcome}</Badge> : null}
             {app !== "ALL" ? (
               <Badge variant="outline">{APP_LABEL_FILTER[app]}</Badge>
             ) : null}
           </div>
-          <Stagger className="grid gap-3" step={0.03}>
-            {rows.map((row) => (
-              <AssertionRowCard key={row.id} row={row} />
+          <div className="grid gap-3">
+            {filtered.map((row) => (
+              <AssertionRowCard key={row.id} row={row as unknown as AssertionRow} />
             ))}
-          </Stagger>
+          </div>
         </div>
       )}
     </div>

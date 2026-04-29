@@ -1,8 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useMemo } from "react";
-import { useAccount, useChainId, useReadContract, useReadContracts } from "wagmi";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,19 +9,35 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/verdict/empty-state";
 import { PageHeader } from "@/components/verdict/page-header";
+import { OwnToggle } from "@/components/verdict/own-toggle";
 import { formatAmount, formatTimestamp, truncateAddress } from "@/lib/format";
-import { abis } from "@/lib/web3/abis";
-import { maybeContractAddress } from "@/lib/web3/addresses";
-import { explorerAddress } from "@/lib/web3/chains";
-import type { GrantSummary } from "@/lib/web3/milestones";
+import { listGrants, type GrantRow } from "@/lib/api-server";
 
-export default function MilestonesListPage() {
-  const chainId = useChainId();
-  const { address } = useAccount();
-  const vaultAddress = maybeContractAddress("milestoneVault");
+export const dynamic = "force-dynamic";
+
+interface SearchParams {
+  mine?: string;
+  account?: string;
+}
+
+export default async function MilestonesListPage({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const sp = await searchParams;
+  const account = sp.mine === "1" && sp.account ? sp.account : undefined;
+
+  let rows: GrantRow[] = [];
+  let error: string | null = null;
+  try {
+    const res = await listGrants({ limit: 50, account });
+    rows = res.grants;
+  } catch (err) {
+    error = (err as Error).message;
+  }
 
   return (
     <div className="space-y-8">
@@ -34,198 +46,63 @@ export default function MilestonesListPage() {
         title="DAO Milestone Vault"
         description="Pre-approve acceptance criteria once. Grantees submit proof per milestone; the judge verifies, the vault releases the slice. No Snapshot loops."
         action={
-          vaultAddress ? (
-            <Button asChild>
-              <Link href="/milestones/new">Create grant</Link>
-            </Button>
-          ) : null
+          <Button asChild>
+            <Link href="/milestones/new">Create grant</Link>
+          </Button>
         }
       />
 
-      {!vaultAddress ? (
-        <NotDeployed chainId={chainId} />
-      ) : (
-        <GrantList
-          address={address}
-          vaultAddress={vaultAddress}
-          chainId={chainId}
+      <OwnToggle active={Boolean(account)} />
+
+      {error ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Indexer catching up</CardTitle>
+            <CardDescription>
+              Grant list is temporarily unavailable ({error}).
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : rows.length === 0 ? (
+        <EmptyState
+          title="No grants yet"
+          description="DAOs define milestone criteria + amounts and pre-fund the vault. Grantees submit per-milestone evidence and funds auto-release on verification."
+          action={
+            <Button asChild>
+              <Link href="/milestones/new">Create grant</Link>
+            </Button>
+          }
         />
+      ) : (
+        <div className="grid gap-4">
+          {rows.map((row) => (
+            <GrantListRow key={row.id} row={row} />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function NotDeployed({ chainId }: { chainId: number }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Contracts not deployed on this chain</CardTitle>
-        <CardDescription>
-          Publish the MilestoneVault address on chain {chainId} to{" "}
-          <code className="font-mono text-white/70">NEXT_PUBLIC_MILESTONE_VAULT</code>.
-        </CardDescription>
-      </CardHeader>
-    </Card>
-  );
-}
-
-function GrantList({
-  address,
-  vaultAddress,
-  chainId,
-}: {
-  address?: `0x${string}`;
-  vaultAddress: `0x${string}`;
-  chainId: number;
-}) {
-  const total = useReadContract({
-    address: vaultAddress,
-    abi: abis.milestoneVault,
-    functionName: "totalGrants",
-  }) as { data: bigint | undefined; isLoading: boolean };
-
-  const totalCount = total.data ? Number(total.data) : 0;
-
-  const ids = useMemo(
-    () => Array.from({ length: totalCount }, (_, i) => BigInt(i + 1)),
-    [totalCount],
-  );
-
-  const { data, isLoading, refetch } = useReadContracts({
-    contracts: ids.map((id) => ({
-      address: vaultAddress,
-      abi: abis.milestoneVault,
-      functionName: "getGrant",
-      args: [id],
-    })),
-    query: { enabled: ids.length > 0 },
-  });
-
-  if (total.isLoading || isLoading) {
-    return (
-      <div className="grid gap-4">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </div>
-    );
-  }
-
-  const rows =
-    data
-      ?.map((res, idx) => {
-        if (!res || res.status !== "success") return null;
-        const id = ids[idx];
-        if (id === undefined) return null;
-        const tuple = res.result as unknown as readonly [
-          `0x${string}`,
-          `0x${string}`,
-          `0x${string}`,
-          bigint,
-          bigint,
-          bigint,
-          boolean,
-          bigint,
-        ];
-        const summary: GrantSummary = {
-          dao: tuple[0],
-          grantee: tuple[1],
-          token: tuple[2],
-          totalAmount: tuple[3],
-          releasedAmount: tuple[4],
-          grantExpiresAt: tuple[5],
-          reclaimed: tuple[6],
-          milestoneCount: tuple[7],
-        };
-        return { id, summary };
-      })
-      .filter((x): x is { id: bigint; summary: GrantSummary } => x !== null) ?? [];
-
-  const mine = address
-    ? rows.filter(
-        ({ summary }) =>
-          summary.dao.toLowerCase() === address.toLowerCase() ||
-          summary.grantee.toLowerCase() === address.toLowerCase(),
-      )
-    : rows;
-
-  if (mine.length === 0) {
-    return (
-      <EmptyState
-        title="No grants yet"
-        description="DAOs define milestone criteria + amounts and pre-fund the vault. Grantees submit per-milestone evidence and funds auto-release on verification."
-        action={
-          <div className="flex items-center gap-3">
-            <Button asChild>
-              <Link href="/milestones/new">Create grant</Link>
-            </Button>
-            <Button variant="ghost" onClick={() => refetch()}>
-              Refresh
-            </Button>
-          </div>
-        }
-      />
-    );
-  }
+function GrantListRow({ row }: { row: GrantRow }) {
+  const total = BigInt(row.totalAmount);
+  const released = BigInt(row.releasedAmount);
+  const progress = total > 0n ? Number((released * 100n) / total) : 0;
 
   return (
-    <div className="grid gap-4">
-      <div className="text-xs font-mono uppercase tracking-widest text-white/30">
-        <a
-          href={explorerAddress(chainId, vaultAddress)}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-white/70"
-        >
-          Vault · {truncateAddress(vaultAddress, 6)}
-        </a>
-      </div>
-      {mine.map(({ id, summary }) => (
-        <GrantRow key={id.toString()} id={id} summary={summary} address={address} />
-      ))}
-    </div>
-  );
-}
-
-function GrantRow({
-  id,
-  summary,
-  address,
-}: {
-  id: bigint;
-  summary: GrantSummary;
-  address?: `0x${string}`;
-}) {
-  const role =
-    address && summary.dao.toLowerCase() === address.toLowerCase()
-      ? "dao"
-      : address && summary.grantee.toLowerCase() === address.toLowerCase()
-        ? "grantee"
-        : "observer";
-
-  const progress =
-    summary.totalAmount > 0n
-      ? Number((summary.releasedAmount * 100n) / summary.totalAmount)
-      : 0;
-
-  return (
-    <Link href={`/milestones/${id.toString()}`} className="group block">
+    <Link href={`/milestones/${row.id}`} className="group block">
       <Card className="transition-colors group-hover:border-white/20 group-hover:bg-white/[0.07]">
         <CardHeader className="flex-row items-start justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <CardTitle className="text-lg">Grant #{id.toString()}</CardTitle>
+              <CardTitle className="text-lg">Grant #{row.id}</CardTitle>
               <Badge variant="outline">
-                {summary.milestoneCount.toString()} milestones
+                {row.milestonesReleased}/{row.milestoneCount} released
               </Badge>
-              <Badge variant="secondary">{role}</Badge>
-              {summary.reclaimed ? (
-                <Badge variant="warning">reclaimed</Badge>
-              ) : null}
             </div>
             <CardDescription className="max-w-xl">
-              {formatAmount(summary.releasedAmount)} /{" "}
-              {formatAmount(summary.totalAmount)} released ·{" "}
-              {truncateAddress(summary.token, 4)}
+              {formatAmount(released)} / {formatAmount(total)} released ·{" "}
+              {truncateAddress(row.token as `0x${string}`, 4)}
             </CardDescription>
           </div>
           <div className="text-right">
@@ -244,19 +121,19 @@ function GrantRow({
             <span>
               DAO{" "}
               <span className="font-mono text-white/70">
-                {truncateAddress(summary.dao, 4)}
+                {truncateAddress(row.dao as `0x${string}`, 4)}
               </span>
             </span>
             <span>
               Grantee{" "}
               <span className="font-mono text-white/70">
-                {truncateAddress(summary.grantee, 4)}
+                {truncateAddress(row.grantee as `0x${string}`, 4)}
               </span>
             </span>
             <span>
               Expires{" "}
               <span className="font-mono text-white/70">
-                {formatTimestamp(Number(summary.grantExpiresAt) * 1000)}
+                {formatTimestamp(new Date(row.grantExpiresAt).getTime())}
               </span>
             </span>
           </div>

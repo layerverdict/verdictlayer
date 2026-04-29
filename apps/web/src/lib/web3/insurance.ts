@@ -39,3 +39,18 @@ export function decodePolicyStatus(raw: number | bigint): PolicyStatus {
   if (n >= 0 && n <= 4) return n as PolicyStatus;
   return 0;
 }
+
+export function decodePolicyStatusLabel(label: string): PolicyStatus {
+  switch (label) {
+    case "ACTIVE":
+      return POLICY_STATUS.ACTIVE;
+    case "CLAIM_PENDING":
+      return POLICY_STATUS.CLAIM_PENDING;
+    case "PAID":
+      return POLICY_STATUS.PAID;
+    case "EXPIRED":
+      return POLICY_STATUS.EXPIRED;
+    default:
+      return POLICY_STATUS.NONE;
+  }
+}

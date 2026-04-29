@@ -49,3 +49,28 @@ export function decodeStatus(raw: number | bigint): EscrowStatus {
   if (n >= 0 && n <= 7) return n as EscrowStatus;
   return 0;
 }
+
+/**
+ * Decode the Solidity enum label emitted by the indexer mirror
+ * (string form like "FUNDED", "DELIVERED") into the numeric enum.
+ */
+export function decodeEscrowStatusLabel(label: string): EscrowStatus {
+  switch (label) {
+    case "FUNDED":
+      return ESCROW_STATUS.FUNDED;
+    case "DELIVERED":
+      return ESCROW_STATUS.DELIVERED;
+    case "ACCEPTED":
+      return ESCROW_STATUS.ACCEPTED;
+    case "DISPUTED":
+      return ESCROW_STATUS.DISPUTED;
+    case "RESOLVED_CLIENT":
+      return ESCROW_STATUS.RESOLVED_CLIENT;
+    case "RESOLVED_FREELANCER":
+      return ESCROW_STATUS.RESOLVED_FREELANCER;
+    case "EXPIRED":
+      return ESCROW_STATUS.EXPIRED;
+    default:
+      return ESCROW_STATUS.NONE;
+  }
+}
