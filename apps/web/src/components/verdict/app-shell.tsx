@@ -115,7 +115,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <MobileNav pathname={pathname} />
             <Link href="/" className="flex items-center gap-3">
               <VerdictLogo className="text-white" />
-              <span className="text-lg font-semibold tracking-tight">Verdict</span>
+              <span className="text-lg font-semibold tracking-tight">Verdict Layer</span>
               <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/40 md:inline-block">
                 {NETWORK_LABEL}
               </span>
@@ -264,7 +264,7 @@ function MobileNav({ pathname }: { pathname: string | null }) {
           <div className="mb-6 flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2" onClick={() => setOpen(false)}>
               <VerdictLogo className="text-white" />
-              <span className="text-base font-semibold tracking-tight">Verdict</span>
+              <span className="text-base font-semibold tracking-tight">Verdict Layer</span>
             </Link>
             <DialogPrimitive.Close asChild>
               <Button variant="ghost" size="icon" aria-label="Close navigation">

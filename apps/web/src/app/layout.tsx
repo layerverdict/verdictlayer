@@ -45,11 +45,19 @@ export const metadata: Metadata = {
     url: "https://verdictlayer.xyz",
     siteName: "Verdict Layer",
     type: "website",
+    images: [{ url: "/logo.png", width: 1248, height: 1248, alt: "Verdict Layer" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Verdict Layer — Verifiable AI Decisions on 0G",
     description: "TEE-attested AI judges producing on-chain verdicts on 0G.",
+    images: ["/logo.png"],
+  },
+  icons: {
+    icon: [
+      { url: "/logo.png", type: "image/png" },
+    ],
+    apple: [{ url: "/logo.png", type: "image/png" }],
   },
 };
 
