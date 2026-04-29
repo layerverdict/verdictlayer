@@ -68,11 +68,15 @@ function HeroSection() {
             {/* Verdict Judge (TEE) */}
             <g>
               <rect x="174" y="58" width="92" height="84" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-              <g transform="translate(194, 78)">
-                <rect x="6" y="6" width="40" height="40" rx="6" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" />
-                <path d="M16 22 L24 36 L34 14" stroke="rgba(255,255,255,0.9)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="26" cy="26" r="1.8" fill="white">
-                  <animate attributeName="r" values="1.5;2.8;1.5" dur="3s" repeatCount="indefinite" />
+              {/* Verdict Layer mark — scaled + centred inside the Judge plate. */}
+              <g transform="translate(191, 76) scale(0.48)">
+                <g fill="rgba(255,255,255,0.88)">
+                  <path d="M22 18 L35 18 L50 55 L65 18 L78 18 L56 68 L44 68 Z" />
+                  <path d="M34 72 L66 72 L56 82 L44 82 Z" />
+                  <path d="M32 86 L68 86 L58 94 L42 94 Z" />
+                </g>
+                <circle cx="50" cy="105" r="2.5" fill="white">
+                  <animate attributeName="opacity" values="0.2;1;0.2" dur="2.4s" repeatCount="indefinite" />
                 </circle>
               </g>
               <text x="220" y="162" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="600" fontSize="12" fill="rgba(255,255,255,0.8)">
@@ -143,7 +147,9 @@ function HeroSection() {
             {/* 0G Storage */}
             <g>
               <polygon points="220,240 248,256 248,288 220,304 192,288 192,256" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-              <circle cx="220" cy="272" r="5" fill="white" />
+              <text x="220" y="278" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="700" fontSize="18" fill="rgba(255,255,255,0.88)" letterSpacing="-0.5">
+                0G
+              </text>
               <text x="220" y="322" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="500" fontSize="11" fill="rgba(255,255,255,0.8)">
                 0G Storage
               </text>
@@ -165,9 +171,9 @@ function HeroSection() {
             {/* 0G Chain */}
             <g>
               <circle cx="400" cy="272" r="28" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-              <rect x="387" y="261" width="26" height="20" rx="3" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-              <line x1="387" y1="267" x2="413" y2="267" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
-              <circle cx="407" cy="274" r="2" fill="white" />
+              <text x="400" y="278" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="700" fontSize="18" fill="rgba(255,255,255,0.88)" letterSpacing="-0.5">
+                0G
+              </text>
               <text x="400" y="318" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="500" fontSize="11" fill="rgba(255,255,255,0.8)">
                 0G Chain
               </text>
