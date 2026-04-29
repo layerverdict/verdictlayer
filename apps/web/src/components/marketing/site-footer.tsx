@@ -8,7 +8,7 @@ export function MarketingFooter() {
       <div className="mx-auto flex max-w-7xl flex-col justify-between gap-16 lg:flex-row">
         <div className="space-y-6 lg:w-1/3">
           <div className="flex items-center gap-3">
-            <VerdictLogo className="text-white" />
+            <VerdictLogo size={36} className="text-white" />
             <span className="text-lg font-bold tracking-tight text-white">
               Verdict Layer
             </span>
@@ -128,7 +128,7 @@ export function MarketingFooter() {
         </div>
       </div>
       <div className="mx-auto mt-20 flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 text-white/30 md:flex-row">
-        <p>&copy; {new Date().getFullYear()} Verdict Layer. Built for the 0G APAC Hackathon 2026.</p>
+        <p>&copy; {new Date().getFullYear()} Verdict Layer.</p>
         <div className="flex gap-6">
           <a
             href="https://chainscan.0g.ai"

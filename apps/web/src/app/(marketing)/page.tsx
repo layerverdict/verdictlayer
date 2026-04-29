@@ -65,20 +65,17 @@ function HeroSection() {
               </text>
             </g>
 
-            {/* Verdict Judge (TEE) */}
+            {/* Verdict Judge (TEE) — drops the PNG mark straight into the SVG. */}
             <g>
-              <rect x="174" y="58" width="92" height="84" rx="14" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />
-              {/* Verdict Layer mark — scaled + centred inside the Judge plate. */}
-              <g transform="translate(191, 76) scale(0.48)">
-                <g fill="rgba(255,255,255,0.88)">
-                  <path d="M22 18 L35 18 L50 55 L65 18 L78 18 L56 68 L44 68 Z" />
-                  <path d="M34 72 L66 72 L56 82 L44 82 Z" />
-                  <path d="M32 86 L68 86 L58 94 L42 94 Z" />
-                </g>
-                <circle cx="50" cy="105" r="2.5" fill="white">
-                  <animate attributeName="opacity" values="0.2;1;0.2" dur="2.4s" repeatCount="indefinite" />
-                </circle>
-              </g>
+              <rect x="174" y="58" width="92" height="84" rx="14" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" />
+              <image
+                href="/logo.png"
+                x="188"
+                y="72"
+                width="64"
+                height="64"
+                preserveAspectRatio="xMidYMid meet"
+              />
               <text x="220" y="162" textAnchor="middle" fontFamily="Inter, sans-serif" fontWeight="600" fontSize="12" fill="rgba(255,255,255,0.8)">
                 Judge
               </text>
@@ -273,13 +270,29 @@ function FeaturesSection() {
             title="Sealed Inference"
             description="Judges run in TEE enclaves on 0G Compute. The model never sees your data outside the attested boundary; every completion ships with a provider signature."
           >
-            <svg width="200" height="120" viewBox="0 0 200 120" className="relative z-10 transition-transform duration-500 group-hover:scale-105" aria-hidden="true">
-              <rect x="60" y="30" width="80" height="60" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
-              <rect x="70" y="40" width="60" height="40" rx="3" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="3 3" />
-              <path d="M82 50 L90 60 L118 40" stroke="rgba(255,255,255,0.9)" strokeWidth="2" fill="none" strokeLinecap="round" />
-              <circle cx="150" cy="60" r="6" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" />
-              <path d="M148 60 L149 62 L152 57" stroke="rgba(255,255,255,0.9)" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              <text x="100" y="104" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="9" fill="rgba(255,255,255,0.4)">
+            <svg
+              width="200"
+              height="120"
+              viewBox="0 0 200 120"
+              className="relative z-10 transition-transform duration-500 group-hover:scale-105"
+              aria-hidden="true"
+            >
+              {/* Sealed enclave: the Verdict Layer mark behind an outer dashed
+                  perimeter (the attestation boundary). */}
+              <rect
+                x="52"
+                y="22"
+                width="96"
+                height="76"
+                rx="12"
+                fill="none"
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth="1"
+                strokeDasharray="3 4"
+              />
+              <rect x="62" y="32" width="76" height="56" rx="8" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+              <image href="/logo.png" x="72" y="36" width="52" height="52" preserveAspectRatio="xMidYMid meet" />
+              <text x="100" y="112" textAnchor="middle" fontFamily="JetBrains Mono, monospace" fontSize="9" fill="rgba(255,255,255,0.4)">
                 TEE · attested
               </text>
             </svg>

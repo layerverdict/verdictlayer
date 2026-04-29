@@ -54,15 +54,8 @@ export const metadata: Metadata = {
     images: ["/logo.png"],
   },
   icons: {
-    // Tab favicon inverts the mark onto a black plate so it reads on
-    // browser chrome that doesn't honour the `color-scheme` CSS media
-    // query; Apple touch icon keeps the same treatment so iOS home
-    // screens also land on the dark plate.
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/logo.png", type: "image/png", sizes: "1248x1248" },
-    ],
-    apple: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/logo.png", type: "image/png", sizes: "1248x1248" }],
+    apple: [{ url: "/logo.png", type: "image/png" }],
   },
 };
 
