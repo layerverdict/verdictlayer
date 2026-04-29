@@ -625,7 +625,7 @@ function CTASection() {
             Open a case
           </Link>
           <a
-            href="https://github.com/qvkare/verdict#readme"
+            href="https://github.com/qvkare/verdictlayer#readme"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full rounded-xl border border-white/20 px-10 py-4 text-center font-medium text-white/70 transition-colors hover:border-white/50 hover:text-white sm:w-auto"
