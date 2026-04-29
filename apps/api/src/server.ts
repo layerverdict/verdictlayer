@@ -12,6 +12,7 @@ import { assertionRoutes } from "./routes/assertions.js";
 import { verdictRoutes } from "./routes/verdict.js";
 import { oracleRoutes } from "./routes/oracle.js";
 import { appsRoutes } from "./routes/apps.js";
+import { judgesRoutes } from "./routes/judges.js";
 import { closeQueues } from "./lib/queue.js";
 import { closeRedis } from "./lib/redis.js";
 import { startJudgmentWorker } from "./workers/judgment.js";
@@ -52,6 +53,7 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(verdictRoutes);
   await app.register(oracleRoutes);
   await app.register(appsRoutes);
+  await app.register(judgesRoutes);
 
   app.setNotFoundHandler((_req, reply) => {
     reply.code(404).send({ error: "Not Found" });

@@ -1,29 +1,24 @@
-"use client";
-
-import { useMemo } from "react";
-import { useChainId, useReadContract, useReadContracts } from "wagmi";
-
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { EmptyState } from "@/components/verdict/empty-state";
-import { Stagger } from "@/components/verdict/motion";
 import { PageHeader } from "@/components/verdict/page-header";
 import { truncateAddress } from "@/lib/format";
-import { abis } from "@/lib/web3/abis";
+import { listJudges, type JudgeRow } from "@/lib/api-server";
 import { maybeContractAddress } from "@/lib/web3/addresses";
-import { explorerAddress } from "@/lib/web3/chains";
+import { explorerAddress, zgMainnet } from "@/lib/web3/chains";
 
-type ReputationTuple = {
-  totalVerdicts: bigint;
-  appealsLost: bigint;
-  reputation: bigint;
-};
+export const dynamic = "force-dynamic";
 
-export default function JudgesPage() {
-  const chainId = useChainId();
+const CHAIN_ID = Number(process.env.NEXT_PUBLIC_CHAIN_ID ?? zgMainnet.id);
+
+export default async function JudgesPage() {
   const registry = maybeContractAddress("reputationRegistry");
-
   return (
     <div className="space-y-8">
       <PageHeader
@@ -31,11 +26,7 @@ export default function JudgesPage() {
         title="TEE Judge reputation"
         description="Every judge that adjudicates on Verdict Layer owns a non-transferable ERC-7857 NFT. Verdict counts, appeal losses, and reputation are on-chain and queryable."
       />
-      {!registry ? (
-        <NotDeployed />
-      ) : (
-        <JudgeGallery registry={registry} chainId={chainId} />
-      )}
+      {!registry ? <NotDeployed /> : <JudgeGallery />}
     </div>
   );
 }
@@ -57,69 +48,10 @@ function NotDeployed() {
   );
 }
 
-function JudgeGallery({
-  registry,
-  chainId,
-}: {
-  registry: `0x${string}`;
-  chainId: number;
-}) {
-  const total = useReadContract({
-    address: registry,
-    abi: abis.reputationRegistry,
-    functionName: "totalMinted",
-  }) as { data: bigint | undefined; isLoading: boolean };
+async function JudgeGallery() {
+  const { judges } = await listJudges();
 
-  // totalMinted() returns nextTokenId. Actual minted ids are 1..total-1.
-  const totalCount = total.data ? Number(total.data) - 1 : 0;
-
-  const ids = useMemo(
-    () => Array.from({ length: Math.max(0, totalCount) }, (_, i) => BigInt(i + 1)),
-    [totalCount],
-  );
-
-  // Parallel reads per token: ownerOf, reputationOf, dataDescriptionsOf.
-  const ownerReads = useReadContracts({
-    contracts: ids.map((id) => ({
-      address: registry,
-      abi: abis.reputationRegistry,
-      functionName: "ownerOf",
-      args: [id],
-    })),
-    query: { enabled: ids.length > 0 },
-  });
-
-  const repReads = useReadContracts({
-    contracts: ids.map((id) => ({
-      address: registry,
-      abi: abis.reputationRegistry,
-      functionName: "reputationOf",
-      args: [id],
-    })),
-    query: { enabled: ids.length > 0 },
-  });
-
-  const descReads = useReadContracts({
-    contracts: ids.map((id) => ({
-      address: registry,
-      abi: abis.reputationRegistry,
-      functionName: "dataDescriptionsOf",
-      args: [id],
-    })),
-    query: { enabled: ids.length > 0 },
-  });
-
-  if (total.isLoading || ownerReads.isLoading || repReads.isLoading) {
-    return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Skeleton className="h-56 w-full" />
-        <Skeleton className="h-56 w-full" />
-        <Skeleton className="h-56 w-full" />
-      </div>
-    );
-  }
-
-  if (ids.length === 0) {
+  if (judges.length === 0) {
     return (
       <EmptyState
         title="No judges minted yet"
@@ -129,56 +61,16 @@ function JudgeGallery({
   }
 
   return (
-    <Stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {ids.map((tokenId, idx) => {
-        const ownerRes = ownerReads.data?.[idx];
-        const repRes = repReads.data?.[idx];
-        const descRes = descReads.data?.[idx];
-        if (!ownerRes || ownerRes.status !== "success") return null;
-
-        const owner = ownerRes.result as unknown as `0x${string}`;
-        const rep =
-          repRes && repRes.status === "success"
-            ? (repRes.result as unknown as ReputationTuple)
-            : null;
-        const descs =
-          descRes && descRes.status === "success"
-            ? (descRes.result as unknown as string[])
-            : [];
-
-        return (
-          <JudgeCard
-            key={tokenId.toString()}
-            tokenId={tokenId}
-            owner={owner}
-            rep={rep}
-            descriptions={descs}
-            chainId={chainId}
-          />
-        );
-      })}
-    </Stagger>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {judges.map((judge) => (
+        <JudgeCard key={judge.tokenId} judge={judge} />
+      ))}
+    </div>
   );
 }
 
-function JudgeCard({
-  tokenId,
-  owner,
-  rep,
-  descriptions,
-  chainId,
-}: {
-  tokenId: bigint;
-  owner: `0x${string}`;
-  rep: ReputationTuple | null;
-  descriptions: string[];
-  chainId: number;
-}) {
-  const model = descriptions[0] ?? "unknown model";
-
-  const reputation = rep ? Number(rep.reputation) : 0;
-  const totalVerdicts = rep ? Number(rep.totalVerdicts) : 0;
-  const appealsLost = rep ? Number(rep.appealsLost) : 0;
+function JudgeCard({ judge }: { judge: JudgeRow }) {
+  const { tokenId, owner, model, reputation, totalVerdicts, appealsLost } = judge;
   const winRate =
     totalVerdicts > 0
       ? Math.max(0, ((totalVerdicts - appealsLost) / totalVerdicts) * 100)
@@ -203,14 +95,14 @@ function JudgeCard({
           </span>
         </div>
         <div className="absolute right-4 top-3 font-mono text-3xl font-light tracking-tight text-white/80">
-          #{tokenId.toString()}
+          #{tokenId}
         </div>
       </div>
       <CardHeader className="gap-1">
         <CardTitle className="text-base">{model}</CardTitle>
         <CardDescription>
           <a
-            href={explorerAddress(chainId, owner)}
+            href={explorerAddress(CHAIN_ID, owner)}
             target="_blank"
             rel="noreferrer"
             className="font-mono text-[11px] hover:text-white/70"

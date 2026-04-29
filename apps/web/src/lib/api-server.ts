@@ -259,6 +259,27 @@ export function getCheck(id: number): Promise<{ check: CheckRow } | null> {
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Judges
+// ─────────────────────────────────────────────────────────────────────
+
+export interface JudgeRow {
+  tokenId: number;
+  owner: `0x${string}`;
+  model: string;
+  descriptions: string[];
+  totalVerdicts: number;
+  appealsLost: number;
+  reputation: number;
+}
+
+export function listJudges(): Promise<{ judges: JudgeRow[] }> {
+  return apiServer<{ judges: JudgeRow[] }>("/api/judges", {
+    revalidate: 10,
+    tags: ["judges"],
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Assertions (list + detail)
 // ─────────────────────────────────────────────────────────────────────
 
