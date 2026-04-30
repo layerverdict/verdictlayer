@@ -1,8 +1,10 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
+import { desc, eq } from "drizzle-orm";
 
 import { eventBus, type VerdictEvent } from "../lib/events.js";
 import { getAssertion } from "../services/assertion.js";
+import { db, schema } from "../db/client.js";
 
 const ID = z.string().regex(/^0x[0-9a-fA-F]{64}$/);
 
@@ -86,12 +88,23 @@ export const verdictRoutes: FastifyPluginAsync = async (app) => {
     // `closed` short-circuits the replay writes.
     const assertion = await getAssertion(id as `0x${string}`);
     if (!closed && assertion && assertion.outcome !== "PENDING") {
+      // Pull the latest reasoning log so the replay payload carries the
+      // confidence / chatId that the UI renders as extra trust proof.
+      const [log] = await db
+        .select()
+        .from(schema.reasoningLogs)
+        .where(eq(schema.reasoningLogs.assertionId, id as `0x${string}`))
+        .orderBy(desc(schema.reasoningLogs.createdAt))
+        .limit(1);
+
       write(
         `event: outcome\n` +
           `data: ${JSON.stringify({
             payload: {
               assertionId: id,
               outcome: assertion.outcome,
+              confidence: log?.confidence ? Number(log.confidence) : undefined,
+              chatId: log?.chatId ?? undefined,
               reasoningRoot: assertion.reasoningRoot,
               verdictTx: assertion.verdictTx,
               resolvedAt: assertion.resolvedAt,

@@ -15,7 +15,8 @@ type Name =
   | "escrow"
   | "parametricInsurance"
   | "milestoneVault"
-  | "authenticityCertifier";
+  | "authenticityCertifier"
+  | "verdictUsdc";
 
 const ENV_KEYS: Record<Name, string> = {
   assertionRegistry: "NEXT_PUBLIC_VERDICT_REGISTRY",
@@ -26,6 +27,7 @@ const ENV_KEYS: Record<Name, string> = {
   parametricInsurance: "NEXT_PUBLIC_PARAMETRIC_INSURANCE",
   milestoneVault: "NEXT_PUBLIC_MILESTONE_VAULT",
   authenticityCertifier: "NEXT_PUBLIC_AUTHENTICITY_CERTIFIER",
+  verdictUsdc: "NEXT_PUBLIC_VERDICT_USDC",
 };
 
 // Inline the reads so Next.js can substitute them at build time — dynamic
@@ -39,6 +41,7 @@ const RAW: Record<Name, string | undefined> = {
   parametricInsurance: process.env.NEXT_PUBLIC_PARAMETRIC_INSURANCE,
   milestoneVault: process.env.NEXT_PUBLIC_MILESTONE_VAULT,
   authenticityCertifier: process.env.NEXT_PUBLIC_AUTHENTICITY_CERTIFIER,
+  verdictUsdc: process.env.NEXT_PUBLIC_VERDICT_USDC,
 };
 
 export function contractAddress(name: Name): Address {

@@ -222,7 +222,20 @@ export async function judge(input: JudgeInput): Promise<JudgeOutput> {
       latencyMs: inference.latencyMs,
     };
 
-    publish("outcome", result);
+    // Flatten to what the SSE client expects. UI code reads
+    // `outcome`, `confidence`, `evidenceCited` at the top level.
+    publish("outcome", {
+      assertionId,
+      outcome: decision.outcome,
+      confidence: decision.confidence,
+      evidenceCited: decision.evidenceCited,
+      reasoningRoot: reasoningUpload.rootHash,
+      verdictTx,
+      providerAddress: inference.providerAddress,
+      model: inference.model,
+      latencyMs: inference.latencyMs,
+      chatId: inference.chatId,
+    });
     publish("done", { ts: Date.now() });
     return result;
   } catch (err) {

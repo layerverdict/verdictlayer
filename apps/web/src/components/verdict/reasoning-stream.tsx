@@ -22,6 +22,11 @@ type StreamEvent =
         confidence?: number;
         reasoningRoot?: string;
         verdictTx?: string;
+        providerAddress?: string;
+        model?: string;
+        latencyMs?: number;
+        chatId?: string;
+        evidenceCited?: string[];
         replay?: boolean;
       };
     }
@@ -148,27 +153,79 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
         </div>
 
         {outcome ? (
-          <div className="grid gap-3 border-t border-white/10 bg-white/[0.02] px-6 py-4 text-xs text-white/50 sm:grid-cols-2">
-            {"reasoningRoot" in outcome && outcome.reasoningRoot ? (
-              <div>
-                Reasoning root
-                <div className="font-mono text-white/70 break-all">
-                  {truncateHash(outcome.reasoningRoot, 10, 8)}
+          <div className="space-y-3 border-t border-white/10 bg-white/[0.02] px-6 py-4">
+            <div className="grid gap-3 text-xs text-white/50 sm:grid-cols-2">
+              {"model" in outcome && outcome.model ? (
+                <div>
+                  TEE judge
+                  <div className="font-mono text-white/80">{outcome.model}</div>
                 </div>
-              </div>
-            ) : null}
-            {"verdictTx" in outcome && outcome.verdictTx ? (
-              <div>
-                Verdict TX
-                <a
-                  href={explorerTx(zgMainnet.id, outcome.verdictTx)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono text-white/70 underline decoration-white/20 underline-offset-2 hover:text-white hover:decoration-white/60"
-                  title="View on 0G Chain Scan"
-                >
-                  {truncateHash(outcome.verdictTx, 10, 8)} ↗
-                </a>
+              ) : null}
+              {"latencyMs" in outcome &&
+              typeof outcome.latencyMs === "number" ? (
+                <div>
+                  Inference latency
+                  <div className="font-mono text-white/80">
+                    {(outcome.latencyMs / 1000).toFixed(2)}s
+                  </div>
+                </div>
+              ) : null}
+              {"confidence" in outcome &&
+              typeof outcome.confidence === "number" ? (
+                <div>
+                  Confidence
+                  <div className="font-mono text-white/80">
+                    {outcome.confidence.toFixed(2)}
+                  </div>
+                </div>
+              ) : null}
+              {"providerAddress" in outcome && outcome.providerAddress ? (
+                <div>
+                  Provider
+                  <div className="font-mono text-white/60 break-all">
+                    {truncateHash(outcome.providerAddress, 8, 6)}
+                  </div>
+                </div>
+              ) : null}
+              {"reasoningRoot" in outcome && outcome.reasoningRoot ? (
+                <div className="sm:col-span-2">
+                  Reasoning root (on 0G Storage)
+                  <div className="font-mono text-white/70 break-all">
+                    {outcome.reasoningRoot}
+                  </div>
+                </div>
+              ) : null}
+              {"verdictTx" in outcome && outcome.verdictTx ? (
+                <div className="sm:col-span-2">
+                  Verdict submitted on-chain
+                  <a
+                    href={explorerTx(zgMainnet.id, outcome.verdictTx)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block font-mono text-white/70 underline decoration-white/20 underline-offset-2 hover:text-white hover:decoration-white/60"
+                    title="View on 0G Chain Scan"
+                  >
+                    {truncateHash(outcome.verdictTx, 12, 10)} ↗
+                  </a>
+                </div>
+              ) : null}
+            </div>
+
+            {"evidenceCited" in outcome &&
+            Array.isArray(outcome.evidenceCited) &&
+            outcome.evidenceCited.length > 0 ? (
+              <div className="text-xs text-white/50">
+                Evidence cited by the judge
+                <ul className="mt-1 space-y-1">
+                  {outcome.evidenceCited.map((c) => (
+                    <li
+                      key={c}
+                      className="font-mono text-[11px] text-white/60 break-all"
+                    >
+                      {c}
+                    </li>
+                  ))}
+                </ul>
               </div>
             ) : null}
           </div>

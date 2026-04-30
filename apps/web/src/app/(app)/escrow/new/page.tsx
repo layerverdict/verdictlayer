@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConnectWall } from "@/components/verdict/connect-wall";
 import { PageHeader } from "@/components/verdict/page-header";
+import { VusdcFaucet } from "@/components/verdict/vusdc-faucet";
 
 export default function NewEscrowPage() {
   const escrowAddress = maybeContractAddress("escrow");
@@ -239,6 +240,8 @@ function NewEscrowForm({ escrowAddress }: { escrowAddress: Address }) {
               required
             />
           </div>
+
+          <VusdcFaucet onClaimed={(addr) => setToken(addr)} />
 
           <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
             <div className="space-y-2">

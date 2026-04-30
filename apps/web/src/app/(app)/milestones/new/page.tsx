@@ -27,6 +27,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConnectWall } from "@/components/verdict/connect-wall";
 import { PageHeader } from "@/components/verdict/page-header";
+import { VusdcFaucet } from "@/components/verdict/vusdc-faucet";
 import { abis } from "@/lib/web3/abis";
 import { maybeContractAddress } from "@/lib/web3/addresses";
 import { runTx } from "@/lib/web3/tx";
@@ -258,6 +259,8 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
                 required
               />
             </div>
+            <VusdcFaucet onClaimed={(addr) => setToken(addr)} />
+
             <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
               <div className="space-y-2">
                 <Label htmlFor="token">Token address</Label>

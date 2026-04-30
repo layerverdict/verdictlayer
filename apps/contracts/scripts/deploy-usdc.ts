@@ -13,7 +13,9 @@ import { ethers, network } from "hardhat";
 const MANIFEST_DIR = resolve(__dirname, "../../../packages/shared/deployments");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
+  const signers = await ethers.getSigners();
+  const deployer = signers[0];
+  if (!deployer) throw new Error("no signer found — set PRIVATE_KEY in .env");
   const chainId = Number((await ethers.provider.getNetwork()).chainId);
   console.log(`deployer=${deployer.address} chainId=${chainId} network=${network.name}`);
 
