@@ -11,8 +11,6 @@ import { LoginButton } from "./login-button";
 import { VerdictLogo } from "./logo";
 import { cn } from "@/lib/utils";
 
-const NETWORK_LABEL = "Mainnet";
-
 type NavIconName =
   | "dashboard"
   | "escrow"
@@ -106,15 +104,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col bg-black text-white">
       <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-black/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="flex h-20 w-full items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <MobileNav pathname={pathname} />
             <Link href="/" className="flex items-center gap-3">
-              <VerdictLogo size={36} className="text-white" />
-              <span className="text-lg font-semibold tracking-tight">Verdict Layer</span>
-              <span className="hidden rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-white/40 md:inline-block">
-                {NETWORK_LABEL}
-              </span>
+              <VerdictLogo size={40} className="text-white" />
+              <span className="text-xl font-semibold tracking-tight">Verdict Layer</span>
             </Link>
           </div>
 
@@ -161,18 +156,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             items={NAV.filter((n) => n.icon === "judges" || n.icon === "history")}
             pathname={pathname}
           />
-          <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/30">
-              Status
-            </div>
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-50" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
-              </span>
-              Registry online
-            </div>
-          </div>
         </aside>
 
         <main id="main" className="flex-1 overflow-x-hidden" tabIndex={-1}>
@@ -288,18 +271,6 @@ function MobileNav({ pathname }: { pathname: string | null }) {
               pathname={pathname}
               onNavigate={() => setOpen(false)}
             />
-          </div>
-          <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] p-3">
-            <div className="mb-1 font-mono text-[10px] uppercase tracking-widest text-white/30">
-              Status
-            </div>
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-50" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
-              </span>
-              Registry online
-            </div>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
