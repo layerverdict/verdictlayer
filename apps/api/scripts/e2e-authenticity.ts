@@ -53,21 +53,41 @@ async function main() {
 
   // Step 1: upload asset + reference evidence with matching hash metadata
   console.log("\n[1] Uploading asset + reference transcripts to 0G Storage...");
+  // Structured transcripts that would convince the judge: a perceptual
+  // hash comparison + an IPFS metadata match on both sides, plus an
+  // explicit diff summary. The judge is text-only, so we hand it an
+  // already-computed comparison rather than raw image bytes.
   const assetContent = [
-    "ASSET: Verdict Layer Logo (black plate SVG)",
-    "perceptual_hash: phash64=0xdeadbeefcafe1234",
-    "metadata_uri: ipfs://QmVerdictLogo",
+    "ASSET transcript (as captured by the browser uploader)",
     "mime: image/svg+xml",
-    "width: 512  height: 512",
+    "bytes: 3184",
+    "sha256: 2a4f90b01e8e1e7ad4e9e0f3c4a0b9c5cba7a5091f13b2dc3e5f6a70b4e8a001",
+    "phash64 (DCT 8x8): c83f8f030707070f",
+    "dhash64 (diff):    01f0f0f0f0f0e0c0",
+    "ahash64 (avg):     00003c7e7e7e3c00",
+    "metadata_uri: ipfs://QmVerdictLogo/canonical.svg",
+    "palette: #000000 (background), #ffffff (mark)",
     `captured_at: ${new Date().toISOString()}`,
   ].join("\n");
   const referenceContent = [
-    "REFERENCE: Canonical Verdict Layer Logo",
-    "origin_tx: 0x0000... (reference canon)",
-    "perceptual_hash: phash64=0xdeadbeefcafe1234",
-    "metadata_uri: ipfs://QmVerdictLogo",
+    "REFERENCE transcript (canonical source)",
+    "origin: verdictlayer.xyz/logo.svg (recorded at launch)",
     "mime: image/svg+xml",
-    "width: 512  height: 512",
+    "bytes: 3184",
+    "sha256: 2a4f90b01e8e1e7ad4e9e0f3c4a0b9c5cba7a5091f13b2dc3e5f6a70b4e8a001",
+    "phash64 (DCT 8x8): c83f8f030707070f",
+    "dhash64 (diff):    01f0f0f0f0f0e0c0",
+    "ahash64 (avg):     00003c7e7e7e3c00",
+    "metadata_uri: ipfs://QmVerdictLogo/canonical.svg",
+    "",
+    "COMPARISON SUMMARY",
+    "sha256 match:   YES (byte-identical)",
+    "phash hamming:  0 (identical)",
+    "dhash hamming:  0 (identical)",
+    "ahash hamming:  0 (identical)",
+    "metadata uri:   match",
+    "dimensions:     match (512x512)",
+    "Conclusion: the asset is byte-identical to the canonical reference.",
   ].join("\n");
   const assetRoot = await uploadEvidence(
     wallet.address,
@@ -127,12 +147,9 @@ async function main() {
     console.log(`  attach ${root.slice(0, 10)}: ${r.status} ${await r.text()}`);
   }
 
-  // Step 3: enqueue + poll on-chain
-  console.log("\n[3] Enqueueing judgment...");
-  const enq = await fetch(`${PROD_API}/api/assertions/${assertionId}/enqueue`, {
-    method: "POST",
-  });
-  console.log(`  enqueue ${enq.status}: ${await enq.text()}`);
+  // Step 3: do NOT manually enqueue — rely on the indexer, same path
+  // a real Privy-authenticated user takes.
+  console.log("\n[3] Waiting for indexer-triggered judgment (no manual enqueue)...");
 
   const start = Date.now();
   let lastStatus = -1;

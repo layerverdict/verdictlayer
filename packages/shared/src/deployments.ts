@@ -36,6 +36,14 @@ export interface DeploymentManifest {
     milestoneVault: Address;
     authenticityCertifier: Address;
   };
+  /**
+   * Optional auxiliary contracts not part of the core protocol — e.g.
+   * the demo vUSDC used to run Escrow / Milestone flows end-to-end on
+   * mainnet without a real stablecoin bridge.
+   */
+  demo?: {
+    verdictUsdc?: Address;
+  };
 }
 
 /**

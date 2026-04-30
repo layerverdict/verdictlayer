@@ -21,5 +21,8 @@
     "parametricInsurance": "0x86ddD4AF766Ca394f303082A87089A510f8cD46B",
     "milestoneVault": "0x2e5c75c560D4877899a49206c629d04b58faD51A",
     "authenticityCertifier": "0xF388E071bD758261980d585359Ce2BA0024A8D46"
+  },
+  "demo": {
+    "verdictUsdc": "0xE7a906025Bf295cdCb47fab0291d68834141485d"
   }
 }
