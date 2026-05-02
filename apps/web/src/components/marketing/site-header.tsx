@@ -16,7 +16,7 @@ const LINKS: Array<{ href: string; label: string; external?: boolean }> = [
   { href: "#features", label: "Features" },
   { href: "#use-cases", label: "Use cases" },
   { href: "/architecture", label: "Architecture" },
-  { href: "https://github.com/qvkare/verdictlayer", label: "GitHub", external: true },
+  { href: "https://github.com/layerverdict/verdictlayer", label: "GitHub", external: true },
 ];
 
 export function MarketingHeader() {

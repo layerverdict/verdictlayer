@@ -80,7 +80,7 @@ export function MarketingFooter() {
             <ul className="space-y-3 text-white/40">
               <li>
                 <a
-                  href="https://github.com/qvkare/verdictlayer"
+                  href="https://github.com/layerverdict/verdictlayer"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-white"
@@ -90,7 +90,7 @@ export function MarketingFooter() {
               </li>
               <li>
                 <a
-                  href="https://github.com/qvkare/verdictlayer#readme"
+                  href="https://github.com/layerverdict/verdictlayer#readme"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="transition-colors hover:text-white"
