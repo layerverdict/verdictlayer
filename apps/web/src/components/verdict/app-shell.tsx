@@ -140,22 +140,37 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <div className="flex flex-1">
-        <aside className="hidden w-60 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:block">
-          <SidebarSection
-            label="Overview"
-            items={NAV.filter((n) => n.icon === "dashboard")}
-            pathname={pathname}
-          />
-          <SidebarSection
-            label="Applications"
-            items={NAV.filter((n) => APPS_SET.has(n.icon))}
-            pathname={pathname}
-          />
-          <SidebarSection
-            label="Protocol"
-            items={NAV.filter((n) => n.icon === "judges" || n.icon === "history")}
-            pathname={pathname}
-          />
+        <aside className="hidden w-60 shrink-0 border-r border-white/10 bg-white/[0.02] p-4 md:flex md:flex-col">
+          <div className="flex-1">
+            <SidebarSection
+              label="Overview"
+              items={NAV.filter((n) => n.icon === "dashboard")}
+              pathname={pathname}
+            />
+            <SidebarSection
+              label="Applications"
+              items={NAV.filter((n) => APPS_SET.has(n.icon))}
+              pathname={pathname}
+            />
+            <SidebarSection
+              label="Protocol"
+              items={NAV.filter((n) => n.icon === "judges" || n.icon === "history")}
+              pathname={pathname}
+            />
+          </div>
+          <div className="border-t border-white/10 pt-4">
+            <a
+              href="https://x.com/verdictlayer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/50 transition-colors hover:bg-white/[0.04] hover:text-white"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+              </svg>
+              @verdictlayer
+            </a>
+          </div>
         </aside>
 
         <main id="main" className="flex-1 overflow-x-hidden" tabIndex={-1}>

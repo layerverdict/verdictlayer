@@ -17,6 +17,7 @@ const LINKS: Array<{ href: string; label: string; external?: boolean }> = [
   { href: "#use-cases", label: "Use cases" },
   { href: "/architecture", label: "Architecture" },
   { href: "https://github.com/layerverdict/verdictlayer", label: "GitHub", external: true },
+  { href: "https://x.com/verdictlayer", label: "X", external: true },
 ];
 
 export function MarketingHeader() {

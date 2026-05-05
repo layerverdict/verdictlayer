@@ -105,6 +105,16 @@ export function MarketingFooter() {
             <ul className="space-y-3 text-white/40">
               <li>
                 <a
+                  href="https://x.com/verdictlayer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors hover:text-white"
+                >
+                  Verdict Layer on X
+                </a>
+              </li>
+              <li>
+                <a
                   href="https://x.com/0G_labs"
                   target="_blank"
                   rel="noopener noreferrer"
