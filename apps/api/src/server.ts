@@ -101,7 +101,7 @@ export async function buildServer(): Promise<FastifyInstance> {
 async function main() {
   const app = await buildServer();
   try {
-    await app.listen({ port: config.API_PORT, host: "0.0.0.0" });
+    await app.listen({ port: config.API_PORT, host: config.API_HOST });
   } catch (err) {
     app.log.error(err);
     process.exit(1);
