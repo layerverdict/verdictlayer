@@ -51,15 +51,30 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
     const handle = (kind: StreamEvent["kind"]) => (ev: MessageEvent) => {
       try {
         const parsed = JSON.parse(ev.data) as { payload: unknown };
-        const payload = parsed.payload as StreamEvent["data"];
-        if (kind === "token" && payload && "token" in payload) {
-          setTokens((prev) => [...prev, payload.token]);
-        } else if (kind === "status" && payload && "status" in payload) {
-          setStatus(payload.status);
+        const payload = parsed.payload;
+        if (kind === "token") {
+          const text = typeof payload === "string"
+            ? payload
+            : payload && typeof payload === "object" && "token" in payload
+              ? (payload as { token: string }).token
+              : null;
+          if (text) setTokens((prev) => [...prev, text]);
+        } else if (kind === "status") {
+          const phase = payload && typeof payload === "object" && "phase" in payload
+            ? (payload as { phase: string }).phase
+            : typeof payload === "string"
+              ? payload
+              : null;
+          if (phase) setStatus(phase);
         } else if (kind === "outcome") {
-          setOutcome(payload);
-        } else if (kind === "error" && payload && "message" in payload) {
-          setError(payload.message ?? "Unknown error");
+          setOutcome(payload as StreamEvent["data"]);
+        } else if (kind === "error") {
+          const message = payload && typeof payload === "object" && "message" in payload
+            ? (payload as { message: string }).message
+            : typeof payload === "string"
+              ? payload
+              : "Unknown error";
+          setError(message);
         }
       } catch {
         // ignore malformed frames
