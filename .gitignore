@@ -66,3 +66,5 @@ plan.md
 0g.md
 CLAUDE.md
 .claude/
+.agents/
+skills-lock.json
