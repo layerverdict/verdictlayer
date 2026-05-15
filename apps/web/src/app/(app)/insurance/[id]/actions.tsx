@@ -69,13 +69,17 @@ export function InsuranceActions(props: InsuranceActionsInput) {
     chainId: props.chainId,
   }) as { data: bigint | undefined };
 
-  const role: "insurer" | "holder" | "observer" = !isConnected
+  const isInsurer = isConnected && address?.toLowerCase() === props.insurer.toLowerCase();
+  const isHolder = isConnected && address?.toLowerCase() === props.holder.toLowerCase();
+  const role: "insurer" | "holder" | "both" | "observer" = !isConnected
     ? "observer"
-    : address?.toLowerCase() === props.insurer.toLowerCase()
-      ? "insurer"
-      : address?.toLowerCase() === props.holder.toLowerCase()
+    : isInsurer && isHolder
+      ? "both"
+      : isHolder
         ? "holder"
-        : "observer";
+        : isInsurer
+          ? "insurer"
+          : "observer";
 
   const terminal =
     status === POLICY_STATUS.PAID || status === POLICY_STATUS.EXPIRED;
@@ -134,7 +138,7 @@ function InsuranceActionButtons({
   onClaimFiled,
 }: InsuranceActionsInput & {
   status: PolicyStatus;
-  role: "insurer" | "holder" | "observer";
+  role: "insurer" | "holder" | "both" | "observer";
   bond: bigint;
   terminal: boolean;
   onClaimFiled: (assertionId: `0x${string}`) => void;
@@ -188,13 +192,13 @@ function InsuranceActionButtons({
 
   return (
     <>
-      {role === "holder" && premiumPayable ? (
+      {(role === "holder" || role === "both") && premiumPayable ? (
         <Button className="w-full" onClick={onPayPremium}>
           Pay premium ({formatAmount(premiumWei)} 0G)
         </Button>
       ) : null}
 
-      {role === "holder" && status === POLICY_STATUS.ACTIVE && inCoverage ? (
+      {(role === "holder" || role === "both") && status === POLICY_STATUS.ACTIVE && inCoverage ? (
         <ClaimDialog
           id={BigInt(id)}
           insuranceAddress={insuranceAddress}
@@ -205,13 +209,13 @@ function InsuranceActionButtons({
         />
       ) : null}
 
-      {role === "holder" && status === POLICY_STATUS.CLAIM_PENDING ? (
+      {(role === "holder" || role === "both") && status === POLICY_STATUS.CLAIM_PENDING ? (
         <Button variant="outline" className="w-full" onClick={onRescueInvalid}>
           Rescue INVALID claim
         </Button>
       ) : null}
 
-      {role === "insurer" && status === POLICY_STATUS.ACTIVE && afterEnd ? (
+      {(role === "insurer" || role === "both") && status === POLICY_STATUS.ACTIVE && afterEnd ? (
         <Button variant="outline" className="w-full" onClick={onReclaim}>
           Reclaim collateral
         </Button>
