@@ -107,36 +107,38 @@ async function CheckDetailBody({
     check.assertionId && !isZeroHash(check.assertionId) ? check.assertionId : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
-        <OverviewCard id={id} check={check} status={status} certifier={certifier} />
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <OverviewCard id={id} check={check} status={status} certifier={certifier} />
 
-        {activeAssertion ? <ReasoningStream assertionId={activeAssertion} /> : null}
+          {status === CHECK_STATUS.CERTIFIED ? <CertifiedBanner check={check} /> : null}
+        </div>
 
-        {status === CHECK_STATUS.CERTIFIED ? <CertifiedBanner check={check} /> : null}
-      </div>
-
-      <aside className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Integration</CardTitle>
-            <CardDescription>
-              Query whether any asset hash has been certified on this chain.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <pre className="rounded-lg border border-white/10 bg-white/[0.03] p-3 font-mono text-white/70">
+        <aside className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Integration</CardTitle>
+              <CardDescription>
+                Query whether any asset hash has been certified on this chain.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs">
+              <pre className="rounded-lg border border-white/10 bg-white/[0.03] p-3 font-mono text-white/70">
 {`certifier.isCertified(
   assetHash
 ) → bool`}
-            </pre>
-            <p className="text-white/40">
-              Emits <span className="font-mono text-white/60">CertificateIssued</span>{" "}
-              when a check lands TRUE. Marketplaces can index directly on it.
-            </p>
-          </CardContent>
-        </Card>
-      </aside>
+              </pre>
+              <p className="text-white/40">
+                Emits <span className="font-mono text-white/60">CertificateIssued</span>{" "}
+                when a check lands TRUE. Marketplaces can index directly on it.
+              </p>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+
+      {activeAssertion ? <ReasoningStream assertionId={activeAssertion} /> : null}
     </div>
   );
 }

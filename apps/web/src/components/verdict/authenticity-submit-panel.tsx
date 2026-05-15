@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { type Address, decodeEventLog } from "viem";
 import {
@@ -21,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
+import { ReasoningStream } from "@/components/verdict/reasoning-stream";
 import { attachEvidence } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
 import { abis } from "@/lib/web3/abis";
@@ -90,6 +92,7 @@ function SignedIn({
   certifier: Address;
   address: `0x${string}`;
 }) {
+  const router = useRouter();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
@@ -103,6 +106,7 @@ function SignedIn({
   const [assetHash, setAssetHash] = useState<`0x${string}` | null>(null);
   const [referenceHash, setReferenceHash] = useState<`0x${string}` | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [streamAssertionId, setStreamAssertionId] = useState<`0x${string}` | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -163,81 +167,85 @@ function SignedIn({
       }
 
       if (assertionId) {
-        const attaches = [
+        setStreamAssertionId(assertionId);
+        Promise.all([
           attachEvidence({ rootHash: assetHash, assertionId, uploader: address }),
           attachEvidence({ rootHash: referenceHash, assertionId, uploader: address }),
-        ];
-        const results = await Promise.allSettled(attaches);
-        for (const r of results) {
-          if (r.status === "rejected") console.warn("attachEvidence failed", r.reason);
-        }
+        ]).catch((err) => console.warn("attachEvidence failed", err));
       }
 
       setAssetHash(null);
       setReferenceHash(null);
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Asset</CardTitle>
-          <CardDescription>
-            The file under scrutiny. We upload it to 0G Storage; the root hash
-            goes on-chain.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EvidenceUploader
-            uploader={address}
-            onUploaded={(r) => setAssetHash(r.rootHash)}
-            helper="Image, document, signature — the artefact you want certified."
-          />
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <form onSubmit={onSubmit} className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Asset</CardTitle>
+            <CardDescription>
+              The file under scrutiny. We upload it to 0G Storage; the root hash
+              goes on-chain.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EvidenceUploader
+              uploader={address}
+              onUploaded={(r) => setAssetHash(r.rootHash)}
+              helper="Image, document, signature — the artefact you want certified."
+            />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Reference</CardTitle>
-          <CardDescription>
-            The canonical source (original mint artwork, notarised document) the
-            asset must match.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EvidenceUploader
-            uploader={address}
-            onUploaded={(r) => setReferenceHash(r.rootHash)}
-            helper="The ground truth — what the asset is being compared against."
-          />
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Reference</CardTitle>
+            <CardDescription>
+              The canonical source (original mint artwork, notarised document) the
+              asset must match.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EvidenceUploader
+              uploader={address}
+              onUploaded={(r) => setReferenceHash(r.rootHash)}
+              helper="The ground truth — what the asset is being compared against."
+            />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="text-xs text-white/50">
-            Bond:{" "}
-            <span className="font-mono text-white">
-              {bond.data ? formatAmount(bond.data) : "…"} 0G
-            </span>
-          </div>
-          <Button
-            type="submit"
-            size="lg"
-            className="w-full"
-            disabled={!assetHash || !referenceHash || submitting || !bond.data}
-          >
-            {submitting ? "Submitting…" : "Submit check"}
-          </Button>
-          <p className="text-xs text-white/40">
-            The judge opens an INSTANT assertion and decides inline; certified
-            checks are queryable by any integrator.
-          </p>
-        </CardContent>
-      </Card>
-    </form>
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <div className="text-xs text-white/50">
+              Bond:{" "}
+              <span className="font-mono text-white">
+                {bond.data ? formatAmount(bond.data) : "…"} 0G
+              </span>
+            </div>
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={!assetHash || !referenceHash || submitting || !bond.data}
+            >
+              {submitting ? "Submitting…" : "Submit check"}
+            </Button>
+            <p className="text-xs text-white/40">
+              The judge opens an INSTANT assertion and decides inline; certified
+              checks are queryable by any integrator.
+            </p>
+          </CardContent>
+        </Card>
+      </form>
+
+      {streamAssertionId ? (
+        <ReasoningStream assertionId={streamAssertionId} />
+      ) : null}
+    </div>
   );
 }
