@@ -109,41 +109,44 @@ async function EscrowDetailBody({
       : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
-        <OverviewCard id={id} record={record} escrowAddress={escrowAddress} />
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <OverviewCard id={id} record={record} escrowAddress={escrowAddress} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Scope</CardTitle>
-            <CardDescription>
-              The judge interprets this verbatim when a dispute is filed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/80">
-              {record.scope || "—"}
-            </pre>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Scope</CardTitle>
+              <CardDescription>
+                The judge interprets this verbatim when a dispute is filed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/80">
+                {record.scope || "—"}
+              </pre>
+            </CardContent>
+          </Card>
+        </div>
 
-        {assertionId ? <ReasoningStream assertionId={assertionId} /> : null}
-        {assertionId ? <AppealPanel assertionId={assertionId} /> : null}
+        <aside className="space-y-6">
+          <EscrowActions
+            id={id}
+            chainId={CHAIN_ID}
+            escrowAddress={escrowAddress}
+            client={record.client}
+            freelancer={record.freelancer}
+            statusLabel={record.status}
+            assertionId={assertionId}
+            serverAssertionId={assertionId}
+          />
+
+          <EvidenceTimeline record={record} />
+        </aside>
       </div>
 
-      <aside className="space-y-6">
-        <EscrowActions
-          id={id}
-          chainId={CHAIN_ID}
-          escrowAddress={escrowAddress}
-          client={record.client}
-          freelancer={record.freelancer}
-          statusLabel={record.status}
-          assertionId={assertionId}
-        />
-
-        <EvidenceTimeline record={record} />
-      </aside>
+      {assertionId ? <ReasoningStream assertionId={assertionId} /> : null}
+      {assertionId ? <AppealPanel assertionId={assertionId} /> : null}
     </div>
   );
 }

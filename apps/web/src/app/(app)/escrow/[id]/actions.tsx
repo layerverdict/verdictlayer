@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { type Address, decodeEventLog } from "viem";
 import { useAccount, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 
@@ -24,6 +25,7 @@ import {
 import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { LoginButton } from "@/components/verdict/login-button";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
+import { ReasoningStream } from "@/components/verdict/reasoning-stream";
 import { attachEvidence } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
 import { abis } from "@/lib/web3/abis";
@@ -42,10 +44,12 @@ export interface EscrowActionsInput {
   freelancer: Address;
   statusLabel: string;
   assertionId: `0x${string}` | null;
+  serverAssertionId?: `0x${string}` | null;
 }
 
 export function EscrowActions(props: EscrowActionsInput) {
   const { address, isConnected } = useAccount();
+  const [disputeAssertionId, setDisputeAssertionId] = useState<`0x${string}` | null>(null);
   const status = decodeEscrowStatusLabel(props.statusLabel);
 
   const bondRead = useReadContract({
@@ -70,35 +74,41 @@ export function EscrowActions(props: EscrowActionsInput) {
     status === ESCROW_STATUS.EXPIRED;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Your move</CardTitle>
-        <CardDescription>
-          {!isConnected
-            ? "Sign in to see the actions available to you on this case."
-            : terminal
-              ? "This case is closed. No further actions required."
-              : role === "observer"
-                ? "You're observing this case. Only the client or freelancer can act."
-                : "Actions below are what the contract allows for your role right now."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!isConnected ? (
-          <div className="flex justify-center">
-            <LoginButton />
-          </div>
-        ) : (
-          <EscrowActionButtons
-            {...props}
-            status={status}
-            role={role}
-            bond={bondRead.data ?? 0n}
-            terminal={terminal}
-          />
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Your move</CardTitle>
+          <CardDescription>
+            {!isConnected
+              ? "Sign in to see the actions available to you on this case."
+              : terminal
+                ? "This case is closed. No further actions required."
+                : role === "observer"
+                  ? "You're observing this case. Only the client or freelancer can act."
+                  : "Actions below are what the contract allows for your role right now."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!isConnected ? (
+            <div className="flex justify-center">
+              <LoginButton />
+            </div>
+          ) : (
+            <EscrowActionButtons
+              {...props}
+              status={status}
+              role={role}
+              bond={bondRead.data ?? 0n}
+              terminal={terminal}
+              onDisputeFiled={setDisputeAssertionId}
+            />
+          )}
+        </CardContent>
+      </Card>
+      {disputeAssertionId && disputeAssertionId !== props.serverAssertionId ? (
+        <ReasoningStream assertionId={disputeAssertionId} />
+      ) : null}
+    </>
   );
 }
 
@@ -113,11 +123,13 @@ function EscrowActionButtons({
   role,
   bond,
   terminal,
+  onDisputeFiled,
 }: EscrowActionsInput & {
   status: EscrowStatus;
   role: "client" | "freelancer" | "observer";
   bond: bigint;
   terminal: boolean;
+  onDisputeFiled: (assertionId: `0x${string}`) => void;
 }) {
   const { writeContractAsync } = useWriteContract();
 
@@ -170,6 +182,7 @@ function EscrowActionButtons({
           chainId={chainId}
           bond={bond}
           client={client}
+          onDisputeFiled={onDisputeFiled}
         />
       ) : null}
 
@@ -291,13 +304,16 @@ function DisputeDialog({
   chainId,
   bond,
   client,
+  onDisputeFiled,
 }: {
   id: bigint;
   escrowAddress: Address;
   chainId: number;
   bond: bigint;
   client: Address;
+  onDisputeFiled: (assertionId: `0x${string}`) => void;
 }) {
+  const router = useRouter();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
@@ -326,15 +342,15 @@ function DisputeDialog({
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       const assertionId = readDisputeAssertionId(receipt.logs);
       if (assertionId) {
-        try {
-          await attachEvidence({ rootHash, assertionId, uploader: client });
-        } catch (err) {
-          console.warn("attachEvidence failed", err);
-        }
+        onDisputeFiled(assertionId);
+        attachEvidence({ rootHash, assertionId, uploader: client }).catch(
+          (err) => console.warn("attachEvidence failed", err),
+        );
       }
 
       setOpen(false);
       setRootHash(null);
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
@@ -391,6 +407,7 @@ function RespondDialog({
   freelancer: Address;
   assertionId: `0x${string}`;
 }) {
+  const router = useRouter();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
@@ -416,14 +433,13 @@ function RespondDialog({
       );
 
       await publicClient.waitForTransactionReceipt({ hash });
-      try {
-        await attachEvidence({ rootHash, assertionId, uploader: freelancer });
-      } catch (err) {
-        console.warn("attachEvidence failed", err);
-      }
+      attachEvidence({ rootHash, assertionId, uploader: freelancer }).catch(
+        (err) => console.warn("attachEvidence failed", err),
+      );
 
       setOpen(false);
       setRootHash(null);
+      router.refresh();
     } finally {
       setSubmitting(false);
     }
