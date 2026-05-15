@@ -27,10 +27,15 @@ export const verdictRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { id: string } }>("/api/verdict/:id/stream", async (req, reply) => {
     const id = ID.parse(req.params.id);
 
+    const origin = req.headers.origin;
+    if (origin) {
+      reply.raw.setHeader("Access-Control-Allow-Origin", origin);
+      reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
+    }
     reply.raw.setHeader("Content-Type", "text/event-stream");
     reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
     reply.raw.setHeader("Connection", "keep-alive");
-    reply.raw.setHeader("X-Accel-Buffering", "no"); // disable nginx buffering
+    reply.raw.setHeader("X-Accel-Buffering", "no");
     reply.raw.flushHeaders?.();
 
     // `closed` guards against writes landing after we've ended the
