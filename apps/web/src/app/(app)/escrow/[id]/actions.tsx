@@ -48,6 +48,7 @@ export interface EscrowActionsInput {
 }
 
 export function EscrowActions(props: EscrowActionsInput) {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const [disputeAssertionId, setDisputeAssertionId] = useState<`0x${string}` | null>(null);
   const status = decodeEscrowStatusLabel(props.statusLabel);
@@ -106,7 +107,7 @@ export function EscrowActions(props: EscrowActionsInput) {
         </CardContent>
       </Card>
       {disputeAssertionId && disputeAssertionId !== props.serverAssertionId ? (
-        <ReasoningStream assertionId={disputeAssertionId} />
+        <ReasoningStream assertionId={disputeAssertionId} onDone={() => router.refresh()} />
       ) : null}
     </>
   );
@@ -313,7 +314,6 @@ function DisputeDialog({
   client: Address;
   onDisputeFiled: (assertionId: `0x${string}`) => void;
 }) {
-  const router = useRouter();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
@@ -350,7 +350,6 @@ function DisputeDialog({
 
       setOpen(false);
       setRootHash(null);
-      router.refresh();
     } finally {
       setSubmitting(false);
     }

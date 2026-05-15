@@ -35,14 +35,17 @@ type StreamEvent =
 
 interface ReasoningStreamProps {
   assertionId: `0x${string}`;
+  onDone?: () => void;
 }
 
-export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
+export function ReasoningStream({ assertionId, onDone }: ReasoningStreamProps) {
   const [tokens, setTokens] = useState<string[]>([]);
   const [status, setStatus] = useState<string>("idle");
   const [outcome, setOutcome] = useState<StreamEvent["data"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
 
   useEffect(() => {
     const url = `${apiBaseUrl}/api/verdict/${assertionId}/stream`;
@@ -85,7 +88,10 @@ export function ReasoningStream({ assertionId }: ReasoningStreamProps) {
     es.addEventListener("token", handle("token") as EventListener);
     es.addEventListener("outcome", handle("outcome") as EventListener);
     es.addEventListener("error", handle("error") as EventListener);
-    es.addEventListener("done", () => es.close());
+    es.addEventListener("done", () => {
+      es.close();
+      onDoneRef.current?.();
+    });
     es.onerror = () => {
       // Browser will auto-retry unless we explicitly close.
     };

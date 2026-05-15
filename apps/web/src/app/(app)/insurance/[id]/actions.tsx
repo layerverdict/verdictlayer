@@ -58,6 +58,7 @@ export interface InsuranceActionsInput {
 }
 
 export function InsuranceActions(props: InsuranceActionsInput) {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const [claimedAssertionId, setClaimedAssertionId] = useState<`0x${string}` | null>(null);
   const status = decodePolicyStatusLabel(props.statusLabel);
@@ -94,9 +95,11 @@ export function InsuranceActions(props: InsuranceActionsInput) {
               ? "Sign in to see the actions available to you on this policy."
               : terminal
                 ? "This policy is closed."
-                : role === "observer"
-                  ? "You're observing this policy. Only the insurer or holder can act."
-                  : "Actions below are what the contract allows for your role right now."}
+                : claimedAssertionId
+                  ? "Claim filed — the TEE judge is working on the verdict below."
+                  : role === "observer"
+                    ? "You're observing this policy. Only the insurer or holder can act."
+                    : "Actions below are what the contract allows for your role right now."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -111,13 +114,14 @@ export function InsuranceActions(props: InsuranceActionsInput) {
               role={role}
               bond={bondRead.data ?? 0n}
               terminal={terminal}
+              claimInProgress={!!claimedAssertionId}
               onClaimFiled={setClaimedAssertionId}
             />
           )}
         </CardContent>
       </Card>
       {claimedAssertionId && claimedAssertionId !== props.serverAssertionId ? (
-        <ReasoningStream assertionId={claimedAssertionId} />
+        <ReasoningStream assertionId={claimedAssertionId} onDone={() => router.refresh()} />
       ) : null}
     </>
   );
@@ -135,12 +139,14 @@ function InsuranceActionButtons({
   role,
   bond,
   terminal,
+  claimInProgress,
   onClaimFiled,
 }: InsuranceActionsInput & {
   status: PolicyStatus;
   role: "insurer" | "holder" | "both" | "observer";
   bond: bigint;
   terminal: boolean;
+  claimInProgress: boolean;
   onClaimFiled: (assertionId: `0x${string}`) => void;
 }) {
   const { writeContractAsync } = useWriteContract();
@@ -198,7 +204,7 @@ function InsuranceActionButtons({
         </Button>
       ) : null}
 
-      {(role === "holder" || role === "both") && status === POLICY_STATUS.ACTIVE && inCoverage ? (
+      {(role === "holder" || role === "both") && status === POLICY_STATUS.ACTIVE && inCoverage && !claimInProgress ? (
         <ClaimDialog
           id={BigInt(id)}
           insuranceAddress={insuranceAddress}
@@ -250,7 +256,6 @@ function ClaimDialog({
   holder: Address;
   onClaimFiled: (assertionId: `0x${string}`) => void;
 }) {
-  const router = useRouter();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
@@ -323,7 +328,6 @@ function ClaimDialog({
 
       setOpen(false);
       setRootHash(null);
-      router.refresh();
     } finally {
       setSubmitting(false);
     }

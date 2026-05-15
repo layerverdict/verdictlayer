@@ -176,7 +176,6 @@ function SignedIn({
 
       setAssetHash(null);
       setReferenceHash(null);
-      router.refresh();
     } finally {
       setSubmitting(false);
     }
@@ -244,7 +243,7 @@ function SignedIn({
       </form>
 
       {streamAssertionId ? (
-        <ReasoningStream assertionId={streamAssertionId} />
+        <ReasoningStream assertionId={streamAssertionId} onDone={() => router.refresh()} />
       ) : null}
     </div>
   );
