@@ -109,40 +109,43 @@ async function PolicyDetailBody({
       : null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
-        <OverviewCard id={id} policy={policy} insuranceAddress={insuranceAddress} />
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <OverviewCard id={id} policy={policy} insuranceAddress={insuranceAddress} />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Trigger condition</CardTitle>
-            <CardDescription>
-              The Verdict Layer judge reads this verbatim when the claim is filed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/80">
-              {policy.condition || "—"}
-            </pre>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Trigger condition</CardTitle>
+              <CardDescription>
+                The Verdict Layer judge reads this verbatim when the claim is filed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="whitespace-pre-wrap rounded-lg border border-white/10 bg-white/[0.03] p-4 text-sm text-white/80">
+                {policy.condition || "—"}
+              </pre>
+            </CardContent>
+          </Card>
+        </div>
 
-        {assertionId ? <ReasoningStream assertionId={assertionId} /> : null}
+        <aside className="space-y-6">
+          <InsuranceActions
+            id={id}
+            chainId={CHAIN_ID}
+            insuranceAddress={insuranceAddress}
+            insurer={policy.insurer}
+            holder={policy.holder}
+            statusLabel={policy.status}
+            premium={policy.premium}
+            coverageStart={policy.coverageStart}
+            coverageEnd={policy.coverageEnd}
+            serverAssertionId={assertionId}
+          />
+        </aside>
       </div>
 
-      <aside className="space-y-6">
-        <InsuranceActions
-          id={id}
-          chainId={CHAIN_ID}
-          insuranceAddress={insuranceAddress}
-          insurer={policy.insurer}
-          holder={policy.holder}
-          statusLabel={policy.status}
-          premium={policy.premium}
-          coverageStart={policy.coverageStart}
-          coverageEnd={policy.coverageEnd}
-        />
-      </aside>
+      {assertionId ? <ReasoningStream assertionId={assertionId} /> : null}
     </div>
   );
 }

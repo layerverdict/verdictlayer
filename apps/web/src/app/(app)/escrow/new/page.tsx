@@ -14,6 +14,7 @@ import {
 } from "wagmi";
 
 import { abis } from "@/lib/web3/abis";
+import { toLocalDatetimeValue } from "@/lib/format";
 import { maybeContractAddress } from "@/lib/web3/addresses";
 import { runTx } from "@/lib/web3/tx";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ function NewEscrowForm({ escrowAddress }: { escrowAddress: Address }) {
   const [deadline, setDeadline] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 14);
-    return d.toISOString().slice(0, 16);
+    return toLocalDatetimeValue(d);
   });
   const [scope, setScope] = useState("");
   const [submitting, setSubmitting] = useState(false);

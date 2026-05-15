@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConnectWall } from "@/components/verdict/connect-wall";
 import { PageHeader } from "@/components/verdict/page-header";
 import { VusdcFaucet } from "@/components/verdict/vusdc-faucet";
+import { toLocalDatetimeValue } from "@/lib/format";
 import { abis } from "@/lib/web3/abis";
 import { maybeContractAddress } from "@/lib/web3/addresses";
 import { runTx } from "@/lib/web3/tx";
@@ -78,7 +79,7 @@ function CreateGrantForm({ vaultAddress }: { vaultAddress: Address }) {
   const [expires, setExpires] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 90);
-    return d.toISOString().slice(0, 16);
+    return toLocalDatetimeValue(d);
   });
   const [milestones, setMilestones] = useState<MilestoneDraft[]>([
     { amount: "", criteria: "" },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { type Address, decodeEventLog } from "viem";
 import {
   useAccount,
@@ -31,6 +32,7 @@ import { EvidenceUploader } from "@/components/verdict/evidence-uploader";
 import { FlightOracle } from "@/components/verdict/flight-oracle";
 import { LoginButton } from "@/components/verdict/login-button";
 import { OutcomeBadge } from "@/components/verdict/outcome-badge";
+import { ReasoningStream } from "@/components/verdict/reasoning-stream";
 import { attachEvidence, getFeatures, type ApiFeatures } from "@/lib/api";
 import { formatAmount } from "@/lib/format";
 import { abis } from "@/lib/web3/abis";
@@ -51,10 +53,13 @@ export interface InsuranceActionsInput {
   premium: string;
   coverageStart: string;
   coverageEnd: string;
+  /** When the RSC already rendered a ReasoningStream (assertionId known at page load), pass it here to avoid rendering a duplicate. */
+  serverAssertionId?: `0x${string}` | null;
 }
 
 export function InsuranceActions(props: InsuranceActionsInput) {
   const { address, isConnected } = useAccount();
+  const [claimedAssertionId, setClaimedAssertionId] = useState<`0x${string}` | null>(null);
   const status = decodePolicyStatusLabel(props.statusLabel);
 
   const bondRead = useReadContract({
@@ -76,35 +81,41 @@ export function InsuranceActions(props: InsuranceActionsInput) {
     status === POLICY_STATUS.PAID || status === POLICY_STATUS.EXPIRED;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Your move</CardTitle>
-        <CardDescription>
-          {!isConnected
-            ? "Sign in to see the actions available to you on this policy."
-            : terminal
-              ? "This policy is closed."
-              : role === "observer"
-                ? "You're observing this policy. Only the insurer or holder can act."
-                : "Actions below are what the contract allows for your role right now."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {!isConnected ? (
-          <div className="flex justify-center">
-            <LoginButton />
-          </div>
-        ) : (
-          <InsuranceActionButtons
-            {...props}
-            status={status}
-            role={role}
-            bond={bondRead.data ?? 0n}
-            terminal={terminal}
-          />
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Your move</CardTitle>
+          <CardDescription>
+            {!isConnected
+              ? "Sign in to see the actions available to you on this policy."
+              : terminal
+                ? "This policy is closed."
+                : role === "observer"
+                  ? "You're observing this policy. Only the insurer or holder can act."
+                  : "Actions below are what the contract allows for your role right now."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!isConnected ? (
+            <div className="flex justify-center">
+              <LoginButton />
+            </div>
+          ) : (
+            <InsuranceActionButtons
+              {...props}
+              status={status}
+              role={role}
+              bond={bondRead.data ?? 0n}
+              terminal={terminal}
+              onClaimFiled={setClaimedAssertionId}
+            />
+          )}
+        </CardContent>
+      </Card>
+      {claimedAssertionId && claimedAssertionId !== props.serverAssertionId ? (
+        <ReasoningStream assertionId={claimedAssertionId} />
+      ) : null}
+    </>
   );
 }
 
@@ -120,11 +131,13 @@ function InsuranceActionButtons({
   role,
   bond,
   terminal,
+  onClaimFiled,
 }: InsuranceActionsInput & {
   status: PolicyStatus;
   role: "insurer" | "holder" | "observer";
   bond: bigint;
   terminal: boolean;
+  onClaimFiled: (assertionId: `0x${string}`) => void;
 }) {
   const { writeContractAsync } = useWriteContract();
 
@@ -188,6 +201,7 @@ function InsuranceActionButtons({
           chainId={chainId}
           bond={bond}
           holder={holder}
+          onClaimFiled={onClaimFiled}
         />
       ) : null}
 
@@ -223,13 +237,16 @@ function ClaimDialog({
   chainId,
   bond,
   holder,
+  onClaimFiled,
 }: {
   id: bigint;
   insuranceAddress: Address;
   chainId: number;
   bond: bigint;
   holder: Address;
+  onClaimFiled: (assertionId: `0x${string}`) => void;
 }) {
+  const router = useRouter();
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [open, setOpen] = useState(false);
@@ -294,15 +311,15 @@ function ClaimDialog({
       }
 
       if (assertionId) {
-        try {
-          await attachEvidence({ rootHash, assertionId, uploader: holder });
-        } catch (err) {
-          console.warn("attachEvidence failed", err);
-        }
+        onClaimFiled(assertionId);
+        attachEvidence({ rootHash, assertionId, uploader: holder }).catch(
+          (err) => console.warn("attachEvidence failed", err),
+        );
       }
 
       setOpen(false);
       setRootHash(null);
+      router.refresh();
     } finally {
       setSubmitting(false);
     }

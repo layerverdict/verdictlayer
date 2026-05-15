@@ -42,6 +42,30 @@ export function formatTimestamp(ts: string | number | Date): string {
   });
 }
 
+/**
+ * Returns a `YYYY-MM-DDTHH:mm` string in the user's local timezone,
+ * suitable for `<input type="datetime-local">` default values.
+ */
+export function toLocalDatetimeValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const h = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d}T${h}:${min}`;
+}
+
+/**
+ * Returns a `YYYY-MM-DD` string in the user's local timezone,
+ * suitable for `<input type="date">` default values.
+ */
+export function toLocalDateValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 export function formatRelative(ts: string | number | Date): string {
   const date = ts instanceof Date ? ts : new Date(ts);
   const diffMs = date.getTime() - Date.now();

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, fetchFlightSnapshot, type FlightSnapshot } from "@/lib/api";
+import { toLocalDateValue } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface FlightOracleProps {
@@ -34,7 +35,7 @@ export function FlightOracle({
 }: FlightOracleProps) {
   const [flightIata, setFlightIata] = useState(defaultFlightIata ?? "");
   const [flightDate, setFlightDate] = useState(
-    defaultFlightDate ?? new Date().toISOString().slice(0, 10),
+    defaultFlightDate ?? toLocalDateValue(new Date()),
   );
   const [fetching, setFetching] = useState(false);
   const [result, setResult] = useState<{

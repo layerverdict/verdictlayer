@@ -18,7 +18,7 @@ import {
 } from "wagmi";
 
 import { Button } from "@/components/ui/button";
-import { ZERO_BYTES32 } from "@/lib/format";
+import { ZERO_BYTES32, toLocalDatetimeValue } from "@/lib/format";
 import {
   Card,
   CardContent,
@@ -77,12 +77,12 @@ function UnderwriteForm({ insuranceAddress }: { insuranceAddress: Address }) {
   const [premium, setPremium] = useState("");
   const [payout, setPayout] = useState("");
   const [coverageStart, setCoverageStart] = useState(() =>
-    new Date().toISOString().slice(0, 16),
+    toLocalDatetimeValue(new Date()),
   );
   const [coverageEnd, setCoverageEnd] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 30);
-    return d.toISOString().slice(0, 16);
+    return toLocalDatetimeValue(d);
   });
   const [condition, setCondition] = useState("");
   const [evidenceSpec, setEvidenceSpec] = useState("");
